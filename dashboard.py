@@ -10,6 +10,29 @@ from monitor import db
 from monitor.config import load_config
 
 st.set_page_config(page_title="SEO Indexing Monitor (Local)", layout="wide")
+st.markdown(
+    """
+    <style>
+    div[data-testid="stCheckbox"] {
+        padding-top: 0.35rem;
+    }
+    div[data-testid="stCheckbox"] > label {
+        align-items: center;
+        gap: 0.55rem;
+    }
+    div[data-testid="stCheckbox"] p {
+        margin: 0;
+        line-height: 1.2;
+    }
+    .filter-caption {
+        font-size: 0.95rem;
+        font-weight: 600;
+        margin: 0 0 0.35rem 0;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 def _load_config() -> Path:
@@ -39,7 +62,7 @@ properties: List[str] = sorted({row["property_key"] for row in all_rows})
 if not properties:
     properties = [p.key for p in cfg.properties]
 
-filter_col1, filter_col2, filter_col3, filter_col4 = st.columns([1.1, 1.0, 1.5, 0.9])
+filter_col1, filter_col2, filter_col3, filter_col4, filter_col5 = st.columns([1.0, 1.0, 1.4, 0.9, 1.0])
 
 with filter_col1:
     selected_property = st.selectbox("Property", options=["All"] + properties, index=0)
@@ -79,6 +102,10 @@ with filter_col4:
         step=1,
     )
 
+with filter_col5:
+    st.markdown("<div class='filter-caption'>Latency Filter</div>", unsafe_allow_html=True)
+    latency_gt_five_only = st.checkbox("Latency >5m only", value=False)
+
 property_key = None if selected_property == "All" else selected_property
 base_rows = all_rows
 if property_key:
@@ -102,6 +129,14 @@ if min_check_count > 0:
         if int(row.get("check_count", 0) or 0) >= int(min_check_count)
     ]
 
+if latency_gt_five_only:
+    base_rows = [
+        row
+        for row in base_rows
+        if row.get("indexing_latency_minutes") not in (None, "")
+        and float(row.get("indexing_latency_minutes") or 0) > 5
+    ]
+
 total_count = len(base_rows)
 indexed_count = sum(1 for row in base_rows if row.get("current_status") == "Indexed")
 error_count = sum(
@@ -111,13 +146,22 @@ error_count = sum(
 )
 not_indexed_count = max(total_count - indexed_count, 0)
 indexed_pct = (indexed_count / total_count * 100) if total_count else 0.0
+late_indexed_count = sum(
+    1
+    for row in base_rows
+    if row.get("indexing_latency_minutes") not in (None, "")
+    and float(row.get("indexing_latency_minutes") or 0) > 5
+)
+late_indexed_pct = (late_indexed_count / indexed_count * 100) if indexed_count else 0.0
 
-c1, c2, c3, c4, c5 = st.columns(5)
+c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
 c1.metric("Total URLs", total_count)
 c2.metric("Indexed", indexed_count)
 c3.metric("Not Indexed", not_indexed_count)
 c4.metric("Indexed %", f"{indexed_pct:.1f}%")
 c5.metric("Errors", error_count)
+c6.metric("Latency >5m", late_indexed_count)
+c7.metric(">5m %", f"{late_indexed_pct:.1f}%")
 
 rows = list(base_rows)
 if status_filter != "All":

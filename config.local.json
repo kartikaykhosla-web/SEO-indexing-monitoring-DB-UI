@@ -2,7 +2,7 @@
   "db_path": "./data/indexing_monitor.db",
   "exports_dir": "./exports",
   "service_account_json_path": "/Users/kartikaykhosla/Documents/article-analyzer/bscadmanager-227c5bb67c18.json",
-  "cutoff_datetime": "2026-04-09T10:00:00+05:30",
+  "cutoff_datetime": "2026-04-08T23:40:00+05:30",
   "properties": [
     {
       "key": "thedailyjagran.com",
