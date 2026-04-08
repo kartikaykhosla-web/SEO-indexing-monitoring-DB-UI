@@ -1,0 +1,87 @@
+{
+  "db_path": "./data/indexing_monitor.db",
+  "exports_dir": "./exports",
+  "service_account_json_path": "",
+  "cutoff_datetime": "today_ist",
+  "properties": [
+    {
+      "key": "thedailyjagran.com",
+      "gsc_site_url": "https://www.thedailyjagran.com/",
+      "discovery_interval_minutes": 5,
+      "sitemap_urls": [
+        "https://www.thedailyjagran.com/news-sitemap.xml",
+        "https://www.thedailyjagran.com/entertainment-news-sitemap.xml",
+        "https://www.thedailyjagran.com/hvv-news-sitemap.xml",
+        "https://www.thedailyjagran.com/sports-news-sitemap.xml",
+        "https://www.thedailyjagran.com/info-news-sitemap.xml"
+      ]
+    },
+    {
+      "key": "jagran.com",
+      "gsc_site_url": "https://www.jagran.com/",
+      "discovery_interval_minutes": 5,
+      "max_gsc_checks_per_hour": 15,
+      "max_new_urls_per_run": 15,
+      "sitemap_urls": [
+        "https://www.jagran.com/all-news-sitemap.xml"
+      ]
+    },
+    {
+      "key": "jagranjosh.com",
+      "gsc_site_url": "https://www.jagranjosh.com/",
+      "discovery_interval_minutes": 5,
+      "max_gsc_checks_per_hour": 15,
+      "max_new_urls_per_run": 15,
+      "sitemap_urls": [
+        "https://www.jagranjosh.com/us/sitemaps/us-news-international.xml",
+        "https://www.jagranjosh.com/newsitemap-general-knowledge-english.xml",
+        "https://www.jagranjosh.com/newsitemap-articles-english.xml",
+        "https://www.jagranjosh.com/newsitemap-articles-hindi.xml",
+        "https://www.jagranjosh.com/college/news-college-articles.xml",
+        "https://www.jagranjosh.com/newsitemap-current-affairs-hindi.xml",
+        "https://www.jagranjosh.com/newsitemap-news-english.xml"
+      ]
+    },
+    {
+      "key": "jagranreviews.com",
+      "gsc_site_url": "https://www.jagranreviews.com/",
+      "discovery_interval_minutes": 5,
+      "allow_lastmod_fallback": true,
+      "sitemap_urls": [
+        "https://www.jagranreviews.com/sitemap-articles.xml"
+      ]
+    },
+    {
+      "key": "onlymyhealth.com_en",
+      "gsc_site_url": "https://www.onlymyhealth.com/",
+      "discovery_interval_minutes": 5,
+      "sitemap_urls": [
+        "https://www.onlymyhealth.com/Resources/omh/xmls/news_sitemap/news-sitemap.xml"
+      ]
+    },
+    {
+      "key": "onlymyhealth.com_hi",
+      "gsc_site_url": "https://www.onlymyhealth.com/",
+      "discovery_interval_minutes": 5,
+      "sitemap_urls": [
+        "https://www.onlymyhealth.com/Resources/omh/xmls/news_sitemap/news-sitemap-hindi.xml"
+      ]
+    },
+    {
+      "key": "herzindagi.com_en",
+      "gsc_site_url": "https://www.herzindagi.com/",
+      "discovery_interval_minutes": 5,
+      "sitemap_urls": [
+        "https://www.herzindagi.com/Resources/lifestyle/xmls/sitemap/news-sitemap-en_US.xml"
+      ]
+    },
+    {
+      "key": "herzindagi.com_hi",
+      "gsc_site_url": "https://www.herzindagi.com/",
+      "discovery_interval_minutes": 5,
+      "sitemap_urls": [
+        "https://www.herzindagi.com/Resources/lifestyle/xmls/sitemap/news-sitemap-hi_IN.xml"
+      ]
+    }
+  ]
+}
