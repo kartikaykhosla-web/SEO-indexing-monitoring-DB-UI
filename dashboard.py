@@ -31,27 +31,95 @@ st.caption(
 )
 
 all_rows = db.fetch_all_summary(conn)
+for row in all_rows:
+    parsed_date = pd.to_datetime(row.get("date", ""), errors="coerce")
+    row["_date_obj"] = parsed_date.date() if not pd.isna(parsed_date) else None
+
 properties: List[str] = sorted({row["property_key"] for row in all_rows})
 if not properties:
     properties = [p.key for p in cfg.properties]
 
-selected_property = st.selectbox("Property", options=["All"] + properties, index=0)
-status_filter = st.selectbox(
-    "Status",
-    options=["All", "Pending", "Indexed", "Error", "Quota Exceeded", "Blocked by robots.txt", "Blocked by noindex", "Excluded"],
-    index=0,
-)
+filter_col1, filter_col2, filter_col3, filter_col4 = st.columns([1.1, 1.0, 1.5, 0.9])
+
+with filter_col1:
+    selected_property = st.selectbox("Property", options=["All"] + properties, index=0)
+
+with filter_col2:
+    status_filter = st.selectbox(
+        "Status",
+        options=[
+            "All",
+            "Pending",
+            "Indexed",
+            "Error",
+            "Quota Exceeded",
+            "Blocked by robots.txt",
+            "Blocked by noindex",
+            "Excluded",
+        ],
+        index=0,
+    )
+
+available_dates = sorted({row["_date_obj"] for row in all_rows if row.get("_date_obj")})
+date_range = None
+if available_dates:
+    with filter_col3:
+        date_range = st.date_input(
+            "Date Range",
+            value=(available_dates[0], available_dates[-1]),
+            min_value=available_dates[0],
+            max_value=available_dates[-1],
+        )
+
+with filter_col4:
+    min_check_count = st.number_input(
+        "Min Check Count",
+        min_value=0,
+        value=0,
+        step=1,
+    )
 
 property_key = None if selected_property == "All" else selected_property
-counts = db.summary_counts(conn, property_key)
+base_rows = all_rows
+if property_key:
+    base_rows = [row for row in base_rows if row["property_key"] == property_key]
 
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("Total URLs", counts["total"])
-c2.metric("Indexed", counts["indexed"])
-c3.metric("Pending", counts["pending"])
-c4.metric("Errors", counts["errors"])
+if available_dates and date_range:
+    if isinstance(date_range, tuple) and len(date_range) == 2:
+        start_date, end_date = date_range
+    else:
+        start_date = end_date = date_range
+    base_rows = [
+        row
+        for row in base_rows
+        if row.get("_date_obj") and start_date <= row["_date_obj"] <= end_date
+    ]
 
-rows = db.fetch_all_summary(conn, property_key=property_key)
+if min_check_count > 0:
+    base_rows = [
+        row
+        for row in base_rows
+        if int(row.get("check_count", 0) or 0) >= int(min_check_count)
+    ]
+
+total_count = len(base_rows)
+indexed_count = sum(1 for row in base_rows if row.get("current_status") == "Indexed")
+error_count = sum(
+    1
+    for row in base_rows
+    if row.get("current_status") in {"Error", "Quota Exceeded"}
+)
+not_indexed_count = max(total_count - indexed_count, 0)
+indexed_pct = (indexed_count / total_count * 100) if total_count else 0.0
+
+c1, c2, c3, c4, c5 = st.columns(5)
+c1.metric("Total URLs", total_count)
+c2.metric("Indexed", indexed_count)
+c3.metric("Not Indexed", not_indexed_count)
+c4.metric("Indexed %", f"{indexed_pct:.1f}%")
+c5.metric("Errors", error_count)
+
+rows = list(base_rows)
 if status_filter != "All":
     rows = [r for r in rows if r.get("current_status") == status_filter]
 
@@ -73,7 +141,7 @@ if rows:
         "gsc_page_fetch_state",
     ]
     show_cols = [c for c in show_cols if c in df.columns]
-    st.dataframe(df[show_cols], use_container_width=True, hide_index=True)
+    st.dataframe(df[show_cols], width="stretch", hide_index=True)
 
     urls = [r["url"] for r in rows]
     chosen_url = st.selectbox("Inspect logs for URL", options=["(none)"] + urls, index=0)
@@ -82,7 +150,7 @@ if rows:
         logs = db.fetch_logs(conn, property_key=property_key, url=chosen_url, limit=500)
         st.subheader("Check Logs")
         if logs:
-            st.dataframe(pd.DataFrame(logs), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(logs), width="stretch", hide_index=True)
         else:
             st.info("No checks logged yet for this URL.")
 else:
@@ -91,7 +159,7 @@ else:
 st.subheader("Recent Logs")
 recent_logs = db.fetch_logs(conn, property_key=property_key, limit=200)
 if recent_logs:
-    st.dataframe(pd.DataFrame(recent_logs), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(recent_logs), width="stretch", hide_index=True)
 else:
     st.info("No logs yet.")
 

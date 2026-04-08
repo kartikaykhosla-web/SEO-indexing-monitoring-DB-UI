@@ -2,7 +2,7 @@
   "db_path": "./data/indexing_monitor.db",
   "exports_dir": "./exports",
   "service_account_json_path": "/Users/kartikaykhosla/Documents/article-analyzer/bscadmanager-227c5bb67c18.json",
-  "cutoff_datetime": "2026-04-08T19:00:00+05:30",
+  "cutoff_datetime": "2026-04-09T10:00:00+05:30",
   "properties": [
     {
       "key": "thedailyjagran.com",
@@ -20,8 +20,8 @@
       "key": "jagran.com",
       "gsc_site_url": "https://www.jagran.com/",
       "discovery_interval_minutes": 5,
-      "max_gsc_checks_per_hour": 15,
-      "max_new_urls_per_run": 15,
+      "max_gsc_checks_per_hour": 25,
+      "max_new_urls_per_run": 25,
       "sitemap_urls": [
         "https://www.jagran.com/all-news-sitemap.xml"
       ]
@@ -30,8 +30,8 @@
       "key": "jagranjosh.com",
       "gsc_site_url": "https://www.jagranjosh.com/",
       "discovery_interval_minutes": 5,
-      "max_gsc_checks_per_hour": 15,
-      "max_new_urls_per_run": 15,
+      "max_gsc_checks_per_hour": 25,
+      "max_new_urls_per_run": 25,
       "sitemap_urls": [
         "https://www.jagranjosh.com/us/sitemaps/us-news-international.xml",
         "https://www.jagranjosh.com/newsitemap-general-knowledge-english.xml",
