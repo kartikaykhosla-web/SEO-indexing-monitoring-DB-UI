@@ -54,9 +54,18 @@ CREATE TABLE IF NOT EXISTS property_state (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS login_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    login_date TEXT NOT NULL,
+    username TEXT NOT NULL,
+    logged_in_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_url_state_property_status ON url_state(property_key, current_status);
 CREATE INDEX IF NOT EXISTS idx_url_state_property_published ON url_state(property_key, sitemap_published_date);
 CREATE INDEX IF NOT EXISTS idx_check_log_property_checked ON check_log(property_key, checked_at);
+CREATE INDEX IF NOT EXISTS idx_login_events_logged_in_at ON login_events(logged_in_at DESC);
 """
 
 
@@ -254,6 +263,44 @@ def fetch_logs(
     query += " ORDER BY checked_at DESC, id DESC LIMIT ?"
     params.append(limit)
     rows = conn.execute(query, params).fetchall()
+    return [dict(row) for row in rows]
+
+
+def insert_login_event(
+    conn: sqlite3.Connection,
+    login_date: str,
+    username: str,
+    logged_in_at: str,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO login_events (
+            login_date,
+            username,
+            logged_in_at,
+            created_at
+        ) VALUES (?, ?, ?, ?)
+        """,
+        (
+            login_date,
+            username,
+            logged_in_at,
+            logged_in_at,
+        ),
+    )
+    conn.commit()
+
+
+def fetch_login_events(conn: sqlite3.Connection, limit: int = 200) -> List[Dict[str, Any]]:
+    rows = conn.execute(
+        """
+        SELECT login_date AS date, username, logged_in_at
+        FROM login_events
+        ORDER BY logged_in_at DESC, id DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
     return [dict(row) for row in rows]
 
 

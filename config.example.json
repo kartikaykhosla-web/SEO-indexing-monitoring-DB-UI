@@ -2,6 +2,8 @@
   "db_path": "./data/indexing_monitor.db",
   "exports_dir": "./exports",
   "service_account_json_path": "",
+  "login_history_spreadsheet_id": "",
+  "login_history_worksheet_name": "login_history",
   "cutoff_datetime": "today_ist",
   "properties": [
     {
@@ -20,8 +22,8 @@
       "key": "jagran.com",
       "gsc_site_url": "https://www.jagran.com/",
       "discovery_interval_minutes": 5,
-      "max_gsc_checks_per_hour": 25,
-      "max_new_urls_per_run": 25,
+      "max_gsc_checks_per_hour": 50,
+      "max_new_urls_per_run": 50,
       "sitemap_urls": [
         "https://www.jagran.com/all-news-sitemap.xml"
       ]
@@ -30,8 +32,8 @@
       "key": "jagranjosh.com",
       "gsc_site_url": "https://www.jagranjosh.com/",
       "discovery_interval_minutes": 5,
-      "max_gsc_checks_per_hour": 25,
-      "max_new_urls_per_run": 25,
+      "max_gsc_checks_per_hour": 50,
+      "max_new_urls_per_run": 50,
       "sitemap_urls": [
         "https://www.jagranjosh.com/us/sitemaps/us-news-international.xml",
         "https://www.jagranjosh.com/newsitemap-general-knowledge-english.xml",
@@ -40,6 +42,38 @@
         "https://www.jagranjosh.com/college/news-college-articles.xml",
         "https://www.jagranjosh.com/newsitemap-current-affairs-hindi.xml",
         "https://www.jagranjosh.com/newsitemap-news-english.xml"
+      ]
+    },
+    {
+      "key": "Herzindagi_C2C_Hindi",
+      "gsc_site_url": "https://www.herzindagi.com/",
+      "discovery_interval_minutes": 5,
+      "sitemap_urls": [
+        "https://www.herzindagi.com/your-picks/hindi/sitemap/article-sitemap.xml"
+      ]
+    },
+    {
+      "key": "Herzindagi_C2C_Engish",
+      "gsc_site_url": "https://www.herzindagi.com/",
+      "discovery_interval_minutes": 5,
+      "sitemap_urls": [
+        "https://www.herzindagi.com/your-picks/sitemap/article-sitemap.xml"
+      ]
+    },
+    {
+      "key": "Jagran_C2C",
+      "gsc_site_url": "https://www.jagran.com/",
+      "discovery_interval_minutes": 5,
+      "sitemap_urls": [
+        "https://www.jagran.com/smart-choice/sitemap/article-sitemap.xml"
+      ]
+    },
+    {
+      "key": "TDJ_C2C",
+      "gsc_site_url": "https://www.thedailyjagran.com/",
+      "discovery_interval_minutes": 5,
+      "sitemap_urls": [
+        "https://www.thedailyjagran.com/smart-guide/sitemap/article-sitemap.xml"
       ]
     },
     {

@@ -24,6 +24,8 @@ class MonitorConfig:
     exports_dir: str
     cutoff_datetime: str
     service_account_json_path: str
+    login_history_spreadsheet_id: str
+    login_history_worksheet_name: str
     properties: List[PropertyConfig]
 
 
@@ -60,6 +62,8 @@ def load_config(path: Path) -> MonitorConfig:
         exports_dir=str(payload.get("exports_dir", "./exports")),
         cutoff_datetime=str(payload.get("cutoff_datetime", "today_ist")),
         service_account_json_path=str(payload.get("service_account_json_path", "")),
+        login_history_spreadsheet_id=str(payload.get("login_history_spreadsheet_id", "")),
+        login_history_worksheet_name=str(payload.get("login_history_worksheet_name", "login_history")),
         properties=props,
     )
 
