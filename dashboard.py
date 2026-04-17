@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List
@@ -91,6 +93,67 @@ def _load_config() -> Path:
         return default
     example = Path("config.example.json")
     return example
+
+
+def _secret_value(*keys: str) -> str:
+    for key in keys:
+        try:
+            value = st.secrets.get(key, "")
+        except Exception:
+            value = ""
+        if value not in (None, ""):
+            return str(value)
+        env_value = os.environ.get(key, "")
+        if env_value:
+            return env_value
+    return ""
+
+
+def _materialize_service_account_from_secrets() -> str:
+    raw_json = _secret_value("GSC_SERVICE_ACCOUNT_JSON", "gsc_service_account_json")
+    if raw_json:
+        path = Path(tempfile.gettempdir()) / "seo-indexing-monitor-gsc.json"
+        path.write_text(raw_json, encoding="utf-8")
+        return str(path)
+
+    try:
+        payload = st.secrets.get("gsc_service_account", None)
+    except Exception:
+        payload = None
+
+    if payload:
+        path = Path(tempfile.gettempdir()) / "seo-indexing-monitor-gsc.json"
+        path.write_text(json.dumps(dict(payload), ensure_ascii=False, indent=2), encoding="utf-8")
+        return str(path)
+    return ""
+
+
+def _apply_runtime_overrides(cfg):
+    db_url = _secret_value("SUPABASE_DB_URL", "supabase_db_url")
+    if db_url:
+        cfg.db_url = db_url
+
+    db_path = _secret_value("INDEX_MONITOR_DB_PATH", "index_monitor_db_path")
+    if db_path:
+        cfg.db_path = db_path
+
+    spreadsheet_id = _secret_value("LOGIN_HISTORY_SPREADSHEET_ID", "login_history_spreadsheet_id")
+    if spreadsheet_id:
+        cfg.login_history_spreadsheet_id = spreadsheet_id
+
+    worksheet_name = _secret_value("LOGIN_HISTORY_WORKSHEET_NAME", "login_history_worksheet_name")
+    if worksheet_name:
+        cfg.login_history_worksheet_name = worksheet_name
+
+    service_account_path = _secret_value("SERVICE_ACCOUNT_JSON_PATH", "service_account_json_path")
+    if service_account_path:
+        cfg.service_account_json_path = service_account_path
+    elif not cfg.service_account_json_path:
+        materialized = _materialize_service_account_from_secrets()
+        if materialized:
+            cfg.service_account_json_path = materialized
+
+    return cfg
 
 
 def _session_file_path(cfg) -> Path:
@@ -244,6 +307,7 @@ def render_account_panel(conn, cfg, username: str, logged_in_at: str) -> None:
 
 config_path = _load_config()
 cfg = load_config(config_path)
+cfg = _apply_runtime_overrides(cfg)
 conn = db.connect(cfg.db_path, cfg.db_url)
 db.init_db(conn)
 
