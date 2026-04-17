@@ -1,0 +1,18 @@
+name: Indexing Monitor - jagran.com
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  run-monitor:
+    uses: ./.github/workflows/indexing-monitor-shared.yml
+    with:
+      property: jagran.com
+      mode: all
+      cutoff_datetime: ''
+    secrets: inherit

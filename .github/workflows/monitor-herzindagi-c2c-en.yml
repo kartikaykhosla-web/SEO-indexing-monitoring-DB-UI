@@ -1,0 +1,18 @@
+name: Indexing Monitor - Herzindagi_C2C_Engish
+
+on:
+  schedule:
+    - cron: '55 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  run-monitor:
+    uses: ./.github/workflows/indexing-monitor-shared.yml
+    with:
+      property: Herzindagi_C2C_Engish
+      mode: all
+      cutoff_datetime: ''
+    secrets: inherit

@@ -1,28 +1,22 @@
-name: Indexing Monitor
+name: Indexing Monitor Shared
 
 on:
-  schedule:
-    - cron: '0 * * * *'
-  workflow_dispatch:
+  workflow_call:
     inputs:
       property:
-        description: 'Optional single property key'
-        required: false
-        default: ''
+        description: Property key to process
+        required: true
+        type: string
       mode:
-        description: 'Run mode'
+        description: Run mode
         required: false
-        default: 'all'
-        type: choice
-        options:
-          - all
-          - discover
-          - poll
-          - export
+        default: all
+        type: string
       cutoff_datetime:
-        description: 'Optional override like 2026-04-08T18:10:00+05:30'
+        description: Optional cutoff override
         required: false
         default: ''
+        type: string
 
 permissions:
   contents: read
@@ -49,7 +43,7 @@ jobs:
         env:
           GSC_SERVICE_ACCOUNT_JSON: ${{ secrets.GSC_SERVICE_ACCOUNT_JSON }}
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-          CUTOFF_DATETIME: ${{ github.event.inputs.cutoff_datetime }}
+          CUTOFF_DATETIME: ${{ inputs.cutoff_datetime }}
         run: |
           python - <<'PY'
           import json
@@ -76,8 +70,8 @@ jobs:
 
       - name: Run indexing monitor
         env:
-          PROPERTY: ${{ github.event.inputs.property }}
-          MODE: ${{ github.event.inputs.mode }}
+          PROPERTY: ${{ inputs.property }}
+          MODE: ${{ inputs.mode }}
         run: |
           CMD=(python run_monitor.py --config "$RUNNER_TEMP/config.json")
           if [ -n "$PROPERTY" ]; then
@@ -86,5 +80,6 @@ jobs:
           if [ -n "$MODE" ]; then
             CMD+=(--mode "$MODE")
           fi
-          printf 'Running: %s\n' "${CMD[*]}"
+          printf 'Running: %s
+' "${CMD[*]}"
           "${CMD[@]}"
