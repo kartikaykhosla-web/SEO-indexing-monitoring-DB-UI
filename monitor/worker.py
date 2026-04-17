@@ -274,6 +274,8 @@ def run_property_gsc(
         if current_status == "Indexed":
             metrics["indexed_now"] += 1
 
+        state["last_crawled_at"] = checked_at
+        state["updated_at"] = checked_at
         state = increment_hourly_count(property_cfg, state, now)
 
         if is_quota_exceeded_error(result.get("error", "")):
@@ -306,26 +308,50 @@ def run_monitor(
         discovered = 0
         checked = 0
         indexed_now = 0
+        state = db.get_property_state(conn, prop.key)
+        run_started_at = to_ist_iso(now_utc())
+        state.update(
+            {
+                "property_key": prop.key,
+                "current_status": "running",
+                "current_run_started_at": run_started_at,
+                "updated_at": run_started_at,
+            }
+        )
+        db.upsert_property_state(conn, state)
 
-        if run_discovery:
-            try:
-                discovered = run_property_discovery(conn, session, prop, cutoff_datetime, now)
-            except Exception as exc:  # noqa: BLE001
-                summaries.append(f"{prop.key}: discovery_error={exc}")
-                continue
+        try:
+            if run_discovery:
+                try:
+                    discovered = run_property_discovery(conn, session, prop, cutoff_datetime, now)
+                except Exception as exc:  # noqa: BLE001
+                    summaries.append(f"{prop.key}: discovery_error={exc}")
+                    continue
 
-        if run_gsc_checks:
-            try:
-                metrics = run_property_gsc(conn, gsc_service, prop, cutoff_datetime, now)
-                checked = metrics["checked"]
-                indexed_now = metrics["indexed_now"]
-            except Exception as exc:  # noqa: BLE001
-                summaries.append(f"{prop.key}: gsc_error={exc}")
-                continue
+            if run_gsc_checks:
+                try:
+                    metrics = run_property_gsc(conn, gsc_service, prop, cutoff_datetime, now)
+                    checked = metrics["checked"]
+                    indexed_now = metrics["indexed_now"]
+                except Exception as exc:  # noqa: BLE001
+                    summaries.append(f"{prop.key}: gsc_error={exc}")
+                    continue
 
-        if run_export:
-            export_all_json(conn, config.exports_dir, property_key=prop.key)
+            if run_export:
+                export_all_json(conn, config.exports_dir, property_key=prop.key)
 
-        summaries.append(f"{prop.key}: discovered={discovered} checked={checked} indexed_now={indexed_now}")
+            summaries.append(f"{prop.key}: discovered={discovered} checked={checked} indexed_now={indexed_now}")
+        finally:
+            final_state = db.get_property_state(conn, prop.key)
+            finished_at = to_ist_iso(now_utc())
+            final_state.update(
+                {
+                    "property_key": prop.key,
+                    "current_status": "idle",
+                    "last_run_finished_at": finished_at,
+                    "updated_at": finished_at,
+                }
+            )
+            db.upsert_property_state(conn, final_state)
 
     return summaries

@@ -59,6 +59,10 @@ CREATE TABLE IF NOT EXISTS property_state (
     gsc_hour_bucket TEXT,
     gsc_checks_this_hour INTEGER NOT NULL DEFAULT 0,
     gsc_quota_backoff_until TEXT,
+    current_status TEXT NOT NULL DEFAULT 'idle',
+    current_run_started_at TEXT,
+    last_run_finished_at TEXT,
+    last_crawled_at TEXT,
     updated_at TEXT NOT NULL
 );
 
@@ -126,6 +130,10 @@ POSTGRES_SCHEMA_STATEMENTS = [
         gsc_hour_bucket TIMESTAMPTZ,
         gsc_checks_this_hour INTEGER NOT NULL DEFAULT 0,
         gsc_quota_backoff_until TIMESTAMPTZ,
+        current_status TEXT NOT NULL DEFAULT 'idle',
+        current_run_started_at TIMESTAMPTZ,
+        last_run_finished_at TIMESTAMPTZ,
+        last_crawled_at TIMESTAMPTZ,
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
     """,
@@ -141,6 +149,10 @@ POSTGRES_SCHEMA_STATEMENTS = [
     "ALTER TABLE url_state ADD COLUMN IF NOT EXISTS discovered_at TIMESTAMPTZ",
     "ALTER TABLE url_state ADD COLUMN IF NOT EXISTS next_check_at TIMESTAMPTZ",
     "ALTER TABLE url_state ADD COLUMN IF NOT EXISTS google_last_crawl_at TIMESTAMPTZ",
+    "ALTER TABLE property_state ADD COLUMN IF NOT EXISTS current_status TEXT NOT NULL DEFAULT 'idle'",
+    "ALTER TABLE property_state ADD COLUMN IF NOT EXISTS current_run_started_at TIMESTAMPTZ",
+    "ALTER TABLE property_state ADD COLUMN IF NOT EXISTS last_run_finished_at TIMESTAMPTZ",
+    "ALTER TABLE property_state ADD COLUMN IF NOT EXISTS last_crawled_at TIMESTAMPTZ",
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_url_state_property_url_unique ON url_state(property_key, url)",
     "CREATE INDEX IF NOT EXISTS idx_url_state_property_status ON url_state(property_key, current_status)",
     "CREATE INDEX IF NOT EXISTS idx_url_state_property_published ON url_state(property_key, sitemap_published_date)",
@@ -214,6 +226,13 @@ def connect(db_path: str, db_url: str = "") -> DBConnection:
     return conn
 
 
+def _ensure_sqlite_column(conn: DBConnection, table: str, column: str, definition: str) -> None:
+    existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column in existing:
+        return
+    conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
 def init_db(conn: DBConnection) -> None:
     if _is_postgres(conn):
         with conn.cursor() as cur:
@@ -221,6 +240,10 @@ def init_db(conn: DBConnection) -> None:
                 cur.execute(statement)
         return
     conn.executescript(SQLITE_SCHEMA_SQL)
+    _ensure_sqlite_column(conn, "property_state", "current_status", "TEXT NOT NULL DEFAULT 'idle'")
+    _ensure_sqlite_column(conn, "property_state", "current_run_started_at", "TEXT")
+    _ensure_sqlite_column(conn, "property_state", "last_run_finished_at", "TEXT")
+    _ensure_sqlite_column(conn, "property_state", "last_crawled_at", "TEXT")
     conn.commit()
 
 
@@ -248,6 +271,10 @@ def get_property_state(conn: DBConnection, property_key: str) -> Dict[str, Any]:
         "gsc_hour_bucket": "",
         "gsc_checks_this_hour": 0,
         "gsc_quota_backoff_until": "",
+        "current_status": "idle",
+        "current_run_started_at": "",
+        "last_run_finished_at": "",
+        "last_crawled_at": "",
         "updated_at": "",
     }
 
@@ -262,13 +289,21 @@ def upsert_property_state(conn: DBConnection, state: Dict[str, Any]) -> None:
             gsc_hour_bucket,
             gsc_checks_this_hour,
             gsc_quota_backoff_until,
+            current_status,
+            current_run_started_at,
+            last_run_finished_at,
+            last_crawled_at,
             updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(property_key) DO UPDATE SET
             last_sitemap_check_at=excluded.last_sitemap_check_at,
             gsc_hour_bucket=excluded.gsc_hour_bucket,
             gsc_checks_this_hour=excluded.gsc_checks_this_hour,
             gsc_quota_backoff_until=excluded.gsc_quota_backoff_until,
+            current_status=excluded.current_status,
+            current_run_started_at=excluded.current_run_started_at,
+            last_run_finished_at=excluded.last_run_finished_at,
+            last_crawled_at=excluded.last_crawled_at,
             updated_at=excluded.updated_at
         """,
         (
@@ -277,6 +312,10 @@ def upsert_property_state(conn: DBConnection, state: Dict[str, Any]) -> None:
             state.get("gsc_hour_bucket", "") or None,
             int(state.get("gsc_checks_this_hour", 0) or 0),
             state.get("gsc_quota_backoff_until", "") or None,
+            state.get("current_status", "idle") or "idle",
+            state.get("current_run_started_at", "") or None,
+            state.get("last_run_finished_at", "") or None,
+            state.get("last_crawled_at", "") or None,
             state.get("updated_at", "") or None,
         ),
     )
@@ -398,6 +437,15 @@ def fetch_all_summary(conn: DBConnection, property_key: Optional[str] = None) ->
         _execute(
             conn,
             "SELECT * FROM url_state ORDER BY property_key ASC, sitemap_published_date DESC, id DESC",
+        )
+    )
+
+
+def fetch_property_states(conn: DBConnection) -> List[Dict[str, Any]]:
+    return _fetchall_dicts(
+        _execute(
+            conn,
+            "SELECT * FROM property_state ORDER BY property_key ASC",
         )
     )
 

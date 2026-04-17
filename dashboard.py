@@ -323,6 +323,24 @@ properties: List[str] = sorted({row["property_key"] for row in all_rows})
 if not properties:
     properties = [p.key for p in cfg.properties]
 
+known_properties = sorted({p.key for p in cfg.properties} | set(properties))
+property_state_rows = {row["property_key"]: row for row in db.fetch_property_states(conn)}
+run_status_rows = []
+for property_name in known_properties:
+    state = property_state_rows.get(property_name, {})
+    last_crawled_at = state.get("last_crawled_at", "")
+    if not last_crawled_at:
+        property_rows = [row for row in all_rows if row.get("property_key") == property_name]
+        timestamps = [str(row.get("last_checked_at", "")).strip() for row in property_rows if str(row.get("last_checked_at", "")).strip()]
+        last_crawled_at = max(timestamps) if timestamps else ""
+    run_status_rows.append(
+        {
+            "property_key": property_name,
+            "current_status": str(state.get("current_status", "idle") or "idle").lower(),
+            "last_crawled_at": last_crawled_at,
+        }
+    )
+
 filter_row1_col1, filter_row1_col2, filter_row1_col3, filter_row1_col4 = st.columns([1.0, 1.0, 1.45, 1.2])
 filter_row2_col1, filter_row2_col2, filter_row2_col3 = st.columns([1.0, 1.0, 1.2])
 
@@ -456,44 +474,77 @@ rows = list(base_rows)
 if status_filter != "All":
     rows = [r for r in rows if r.get("current_status") == status_filter]
 
-st.subheader("URL State")
-if rows:
-    df = pd.DataFrame(rows)
-    show_cols = [
-        "property_key",
-        "date",
-        "url",
-        "sitemap_published_date",
-        "current_status",
-        "check_count",
-        "first_checked_at",
-        "last_checked_at",
-        "google_last_crawl_at",
-        "indexing_latency_minutes",
-        "gsc_coverage_state",
-        "gsc_page_fetch_state",
-    ]
-    show_cols = [c for c in show_cols if c in df.columns]
-    st.dataframe(df[show_cols], width="stretch", hide_index=True)
+url_state_tab, run_status_tab = st.tabs(["URL State", "Run Status"])
 
-    urls = [r["url"] for r in rows]
-    chosen_url = st.selectbox("Inspect logs for URL", options=["(none)"] + urls, index=0)
+with url_state_tab:
+    st.subheader("URL State")
+    if rows:
+        df = pd.DataFrame(rows)
+        show_cols = [
+            "property_key",
+            "date",
+            "url",
+            "sitemap_published_date",
+            "current_status",
+            "check_count",
+            "first_checked_at",
+            "last_checked_at",
+            "google_last_crawl_at",
+            "indexing_latency_minutes",
+            "gsc_coverage_state",
+            "gsc_page_fetch_state",
+        ]
+        show_cols = [c for c in show_cols if c in df.columns]
+        st.dataframe(df[show_cols], width="stretch", hide_index=True)
 
-    if chosen_url != "(none)":
-        logs = db.fetch_logs(conn, property_key=property_key, url=chosen_url, limit=500)
-        st.subheader("Check Logs")
-        if logs:
-            st.dataframe(pd.DataFrame(logs), width="stretch", hide_index=True)
-        else:
-            st.info("No checks logged yet for this URL.")
-else:
-    st.info("No rows found for the current filter.")
+        urls = [r["url"] for r in rows]
+        chosen_url = st.selectbox("Inspect logs for URL", options=["(none)"] + urls, index=0)
 
-st.subheader("Recent Logs")
-recent_logs = db.fetch_logs(conn, property_key=property_key, limit=200)
-if recent_logs:
-    st.dataframe(pd.DataFrame(recent_logs), width="stretch", hide_index=True)
-else:
-    st.info("No logs yet.")
+        if chosen_url != "(none)":
+            logs = db.fetch_logs(conn, property_key=property_key, url=chosen_url, limit=500)
+            st.subheader("Check Logs")
+            if logs:
+                st.dataframe(pd.DataFrame(logs), width="stretch", hide_index=True)
+            else:
+                st.info("No checks logged yet for this URL.")
+    else:
+        st.info("No rows found for the current filter.")
+
+    st.subheader("Recent Logs")
+    recent_logs = db.fetch_logs(conn, property_key=property_key, limit=200)
+    if recent_logs:
+        st.dataframe(pd.DataFrame(recent_logs), width="stretch", hide_index=True)
+    else:
+        st.info("No logs yet.")
+
+with run_status_tab:
+    st.subheader("Run Status")
+    st.caption("Track which property is running right now and when each property last checked a URL.")
+    run_rows = list(run_status_rows)
+    if property_key:
+        run_rows = [row for row in run_rows if row["property_key"] == property_key]
+    for row in run_rows:
+        row["last_crawled_at_display"] = _format_ist(row.get("last_crawled_at", ""))
+        row["current_status_display"] = str(row.get("current_status", "idle")).title()
+    run_rows.sort(
+        key=lambda row: (
+            0 if row.get("current_status") == "running" else 1,
+            row.get("last_crawled_at", "") or "",
+            row.get("property_key", ""),
+        ),
+        reverse=False,
+    )
+    run_rows.sort(
+        key=lambda row: row.get("last_crawled_at", "") or "",
+        reverse=True,
+    )
+    run_rows.sort(key=lambda row: 0 if row.get("current_status") == "running" else 1)
+
+    if run_rows:
+        status_df = pd.DataFrame(run_rows)[["property_key", "current_status_display", "last_crawled_at_display"]]
+        status_df.columns = ["Property", "Current Status", "Last Crawled At"]
+        st.dataframe(status_df, width="stretch", hide_index=True)
+    else:
+        st.info("No property run status available yet.")
 
 conn.close()
