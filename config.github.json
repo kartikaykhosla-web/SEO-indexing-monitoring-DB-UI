@@ -1,5 +1,5 @@
 {
-  "db_path": "./data/indexing_monitor.db",
+  "db_path": "/tmp/indexing_monitor.db",
   "exports_dir": "./exports",
   "service_account_json_path": "",
   "login_history_spreadsheet_id": "",

@@ -54,7 +54,7 @@ def main() -> int:
         raise FileNotFoundError(f"Config not found: {config_path}")
 
     cfg = load_config(config_path)
-    conn = db.connect(cfg.db_path)
+    conn = db.connect(cfg.db_path, cfg.db_url)
     db.init_db(conn)
 
     if args.reset_db:

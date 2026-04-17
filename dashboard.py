@@ -244,7 +244,7 @@ def render_account_panel(conn, cfg, username: str, logged_in_at: str) -> None:
 
 config_path = _load_config()
 cfg = load_config(config_path)
-conn = db.connect(cfg.db_path)
+conn = db.connect(cfg.db_path, cfg.db_url)
 db.init_db(conn)
 
 logged_in_username, logged_in_at = require_login(conn, cfg)

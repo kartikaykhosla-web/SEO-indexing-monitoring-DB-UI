@@ -21,6 +21,7 @@ class PropertyConfig:
 @dataclass
 class MonitorConfig:
     db_path: str
+    db_url: str
     exports_dir: str
     cutoff_datetime: str
     service_account_json_path: str
@@ -59,6 +60,7 @@ def load_config(path: Path) -> MonitorConfig:
         )
     return MonitorConfig(
         db_path=str(payload.get("db_path", "./data/indexing_monitor.db")),
+        db_url=str(payload.get("db_url", "")),
         exports_dir=str(payload.get("exports_dir", "./exports")),
         cutoff_datetime=str(payload.get("cutoff_datetime", "today_ist")),
         service_account_json_path=str(payload.get("service_account_json_path", "")),
