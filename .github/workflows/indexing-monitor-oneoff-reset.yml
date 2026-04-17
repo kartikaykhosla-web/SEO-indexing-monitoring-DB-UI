@@ -1,5 +1,7 @@
 name: Indexing Monitor - One-Off Reset
 
+# One-time reset run using the default cutoff from config.github.json.
+
 on:
   push:
     branches:
