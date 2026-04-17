@@ -18,9 +18,14 @@ on:
           - poll
           - export
       cutoff_datetime:
-        description: Optional override like 2026-04-17T18:20:00+05:30
+        description: Optional override like 2026-04-17T17:20:00+05:30
         required: false
         default: ''
+      reset_db:
+        description: Clear Supabase tables before running
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -76,6 +81,7 @@ jobs:
         env:
           PROPERTY: ${{ github.event.inputs.property }}
           MODE: ${{ github.event.inputs.mode }}
+          RESET_DB: ${{ github.event.inputs.reset_db }}
         run: |
           CMD=(python run_monitor.py --config "$RUNNER_TEMP/config.json")
           if [ -n "$PROPERTY" ]; then
@@ -83,6 +89,9 @@ jobs:
           fi
           if [ -n "$MODE" ]; then
             CMD+=(--mode "$MODE")
+          fi
+          if [ "$RESET_DB" = "true" ]; then
+            CMD+=(--reset-db)
           fi
           printf 'Running: %s
 ' "${CMD[*]}"
