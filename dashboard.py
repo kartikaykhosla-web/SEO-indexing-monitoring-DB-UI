@@ -191,6 +191,16 @@ def _format_ist(value: str) -> str:
         return raw
 
 
+def _format_timestamp_columns(df: pd.DataFrame, columns: List[str]) -> pd.DataFrame:
+    if df.empty:
+        return df
+    formatted = df.copy()
+    for column in columns:
+        if column in formatted.columns:
+            formatted[column] = formatted[column].map(_format_ist)
+    return formatted
+
+
 def _next_expected_run(property_key: str, reference: datetime | None = None) -> str:
     minute = PROPERTY_SCHEDULE_MINUTES.get(property_key)
     if minute is None:
@@ -518,6 +528,15 @@ with url_state_tab:
     st.subheader("URL State")
     if rows:
         df = pd.DataFrame(rows)
+        df = _format_timestamp_columns(
+            df,
+            [
+                "sitemap_published_date",
+                "first_checked_at",
+                "last_checked_at",
+                "google_last_crawl_at",
+            ],
+        )
         show_cols = [
             "property_key",
             "date",
@@ -542,7 +561,11 @@ with url_state_tab:
             logs = db.fetch_logs(conn, property_key=property_key, url=chosen_url, limit=500)
             st.subheader("Check Logs")
             if logs:
-                st.dataframe(pd.DataFrame(logs), width="stretch", hide_index=True)
+                logs_df = _format_timestamp_columns(
+                    pd.DataFrame(logs),
+                    ["checked_at", "last_crawl_time", "created_at"],
+                )
+                st.dataframe(logs_df, width="stretch", hide_index=True)
             else:
                 st.info("No checks logged yet for this URL.")
     else:
@@ -551,7 +574,11 @@ with url_state_tab:
     st.subheader("Recent Logs")
     recent_logs = db.fetch_logs(conn, property_key=property_key, limit=200)
     if recent_logs:
-        st.dataframe(pd.DataFrame(recent_logs), width="stretch", hide_index=True)
+        recent_logs_df = _format_timestamp_columns(
+            pd.DataFrame(recent_logs),
+            ["checked_at", "last_crawl_time", "created_at"],
+        )
+        st.dataframe(recent_logs_df, width="stretch", hide_index=True)
     else:
         st.info("No logs yet.")
 
