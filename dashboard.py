@@ -17,6 +17,20 @@ from monitor import sheets as sheet_logger
 
 IST = timezone(timedelta(hours=5, minutes=30))
 SESSION_FILE_NAME = ".dashboard_session.json"
+PROPERTY_SCHEDULE_MINUTES = {
+    "thedailyjagran.com": 0,
+    "TDJ_C2C": 5,
+    "herzindagi.com_hi": 10,
+    "herzindagi.com_en": 15,
+    "Herzindagi_C2C_Hindi": 20,
+    "Herzindagi_C2C_Engish": 25,
+    "jagran.com": 30,
+    "Jagran_C2C": 35,
+    "jagranjosh.com": 40,
+    "jagranreviews.com": 45,
+    "onlymyhealth.com_en": 50,
+    "onlymyhealth.com_hi": 55,
+}
 
 st.set_page_config(page_title="SEO Indexing Monitor (Local)", layout="wide")
 st.markdown(
@@ -175,6 +189,17 @@ def _format_ist(value: str) -> str:
         return parsed.astimezone(IST).replace(microsecond=0).isoformat()
     except Exception:
         return raw
+
+
+def _next_expected_run(property_key: str, reference: datetime | None = None) -> str:
+    minute = PROPERTY_SCHEDULE_MINUTES.get(property_key)
+    if minute is None:
+        return ""
+    current = (reference or _ist_now()).astimezone(IST).replace(second=0, microsecond=0)
+    candidate = current.replace(minute=minute)
+    if candidate <= current:
+        candidate = candidate + timedelta(hours=1)
+    return candidate.isoformat()
 
 
 def _normalize_username(username: str) -> tuple[str, str]:
@@ -366,12 +391,25 @@ with filter_row1_col2:
 available_dates = sorted({row["_date_obj"] for row in all_rows if row.get("_date_obj")})
 date_range = None
 if available_dates:
+    today_ist = _ist_now().date()
+    if today_ist in available_dates:
+        default_start = default_end = today_ist
+    else:
+        default_start = default_end = available_dates[-1]
+    date_range_key = "date_range_filter"
+    date_range_anchor_key = "date_range_filter_anchor"
+    current_anchor = st.session_state.get(date_range_anchor_key)
+    desired_anchor = default_end.isoformat()
+    if current_anchor != desired_anchor:
+        st.session_state[date_range_key] = (default_start, default_end)
+        st.session_state[date_range_anchor_key] = desired_anchor
     with filter_row1_col3:
         date_range = st.date_input(
             "Date Range",
-            value=(available_dates[0], available_dates[-1]),
+            value=st.session_state.get(date_range_key, (default_start, default_end)),
             min_value=available_dates[0],
             max_value=available_dates[-1],
+            key=date_range_key,
         )
 
 with filter_row1_col4:
@@ -525,6 +563,9 @@ with run_status_tab:
         run_rows = [row for row in run_rows if row["property_key"] == property_key]
     for row in run_rows:
         row["last_crawled_at_display"] = _format_ist(row.get("last_crawled_at", ""))
+        row["last_run_finished_at_display"] = _format_ist(row.get("last_run_finished_at", ""))
+        row["next_expected_run"] = _next_expected_run(row.get("property_key", ""))
+        row["next_expected_run_display"] = _format_ist(row.get("next_expected_run", ""))
         row["current_status_display"] = str(row.get("current_status", "idle")).title()
     run_rows.sort(
         key=lambda row: (
@@ -541,8 +582,22 @@ with run_status_tab:
     run_rows.sort(key=lambda row: 0 if row.get("current_status") == "running" else 1)
 
     if run_rows:
-        status_df = pd.DataFrame(run_rows)[["property_key", "current_status_display", "last_crawled_at_display"]]
-        status_df.columns = ["Property", "Current Status", "Last Crawled At"]
+        status_df = pd.DataFrame(run_rows)[
+            [
+                "property_key",
+                "current_status_display",
+                "last_crawled_at_display",
+                "last_run_finished_at_display",
+                "next_expected_run_display",
+            ]
+        ]
+        status_df.columns = [
+            "Property",
+            "Current Status",
+            "Last Crawled At",
+            "Last Run Finished At",
+            "Next Expected Run",
+        ]
         st.dataframe(status_df, width="stretch", hide_index=True)
     else:
         st.info("No property run status available yet.")
