@@ -80,6 +80,5 @@ jobs:
           if [ -n "$MODE" ]; then
             CMD+=(--mode "$MODE")
           fi
-          printf 'Running: %s
-' "${CMD[*]}"
+          printf 'Running: %s\n' "${CMD[*]}"
           "${CMD[@]}"
