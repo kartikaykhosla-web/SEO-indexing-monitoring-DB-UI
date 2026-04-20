@@ -301,6 +301,27 @@ def _latency_value(row: dict) -> float | None:
         return None
 
 
+def _latency_in_range(row: dict, min_minutes: int, max_minutes: int) -> bool:
+    value = _latency_value(row)
+    if value is None:
+        return False
+    if min_minutes > 0 and value < float(min_minutes):
+        return False
+    if max_minutes > 0 and value > float(max_minutes):
+        return False
+    return True
+
+
+def _latency_range_label(min_minutes: int, max_minutes: int) -> str:
+    if min_minutes > 0 and max_minutes > 0:
+        return f"{min_minutes}-{max_minutes}m"
+    if min_minutes > 0:
+        return f">={min_minutes}m"
+    if max_minutes > 0:
+        return f"<={max_minutes}m"
+    return "All"
+
+
 def _friendly_login_sheet_error(raw_error: str) -> str:
     message = str(raw_error or "").strip()
     lowered = message.lower()
@@ -476,22 +497,41 @@ with filter_row2_col1:
     )
 
 with filter_row2_col2:
-    latency_threshold = st.number_input(
-        "Latency Threshold (min)",
-        min_value=0,
-        value=5,
-        step=1,
-    )
+    st.markdown("<div class='filter-caption'>Latency Range (min)</div>", unsafe_allow_html=True)
+    latency_min_col, latency_max_col = st.columns(2)
+    with latency_min_col:
+        min_latency = st.number_input(
+            "Min",
+            min_value=0,
+            value=5,
+            step=1,
+            key="min_latency",
+        )
+    with latency_max_col:
+        max_latency = st.number_input(
+            "Max",
+            min_value=0,
+            value=0,
+            step=1,
+            key="max_latency",
+            help="Keep 0 for no upper limit.",
+        )
 
 with filter_row2_col3:
     st.markdown("<div class='filter-caption'>Latency Filter</div>", unsafe_allow_html=True)
-    latency_over_threshold_only = st.checkbox(
-        "Show only URLs above the entered threshold",
+    latency_range_only = st.checkbox(
+        "Show only URLs in the entered latency range",
         value=False,
-        help=f"Uses the current Latency Threshold value: {int(latency_threshold)} minutes",
+        help=(
+            "Uses the Min and Max latency values. Keep Max as 0 if you only want "
+            f"latency >= {int(min_latency)} minutes."
+        ),
     )
 
 property_key = None if selected_property == "All" else selected_property
+if max_latency > 0 and max_latency < min_latency:
+    st.warning("Max latency is lower than Min latency, so the latency range will not match any URLs.")
+
 base_rows = all_rows
 if property_key:
     base_rows = [row for row in base_rows if row["property_key"] == property_key]
@@ -523,11 +563,11 @@ if min_check_count > 0:
         if int(row.get("check_count", 0) or 0) >= int(min_check_count)
     ]
 
-if latency_over_threshold_only:
+if latency_range_only:
     base_rows = [
         row
         for row in base_rows
-        if (_latency_value(row) is not None and _latency_value(row) > float(latency_threshold))
+        if _latency_in_range(row, int(min_latency), int(max_latency))
     ]
 
 total_count = len(base_rows)
@@ -539,10 +579,11 @@ error_count = sum(
 )
 not_indexed_count = max(total_count - indexed_count, 0)
 indexed_pct = (indexed_count / total_count * 100) if total_count else 0.0
+latency_label = _latency_range_label(int(min_latency), int(max_latency))
 late_indexed_count = sum(
     1
     for row in base_rows
-    if (_latency_value(row) is not None and _latency_value(row) > float(latency_threshold))
+    if _latency_in_range(row, int(min_latency), int(max_latency))
 )
 late_indexed_pct = (late_indexed_count / indexed_count * 100) if indexed_count else 0.0
 
@@ -552,8 +593,8 @@ c2.metric("Indexed", indexed_count)
 c3.metric("Not Indexed", not_indexed_count)
 c4.metric("Indexed %", f"{indexed_pct:.1f}%")
 c5.metric("Errors", error_count)
-c6.metric(f"Latency >{int(latency_threshold)}m", late_indexed_count)
-c7.metric(f">{int(latency_threshold)}m %", f"{late_indexed_pct:.1f}%")
+c6.metric(f"Latency {latency_label}", late_indexed_count)
+c7.metric(f"{latency_label} %", f"{late_indexed_pct:.1f}%")
 
 rows = list(base_rows)
 if status_filter != "All":
