@@ -214,7 +214,14 @@ def connect(db_path: str, db_url: str = "") -> DBConnection:
     if db_url.strip():
         if psycopg is None:
             raise RuntimeError("psycopg is required for Supabase/Postgres connections. Add it to requirements first.")
-        conn = psycopg.connect(db_url, row_factory=dict_row, autocommit=True)
+        # Supabase's transaction pooler uses PgBouncer, which does not preserve
+        # psycopg prepared statements across transactions.
+        conn = psycopg.connect(
+            db_url,
+            row_factory=dict_row,
+            autocommit=True,
+            prepare_threshold=None,
+        )
         return conn
 
     path = Path(db_path)
