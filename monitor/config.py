@@ -16,6 +16,7 @@ class PropertyConfig:
     max_new_urls_per_run: Optional[int] = None
     max_gsc_checks_per_run: Optional[int] = None
     allow_lastmod_fallback: bool = False
+    single_gsc_check_per_day: bool = False
 
 
 @dataclass
@@ -56,6 +57,7 @@ def load_config(path: Path) -> MonitorConfig:
                     else None
                 ),
                 allow_lastmod_fallback=bool(item.get("allow_lastmod_fallback", False)),
+                single_gsc_check_per_day=bool(item.get("single_gsc_check_per_day", False)),
             )
         )
     return MonitorConfig(

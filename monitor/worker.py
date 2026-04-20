@@ -11,6 +11,7 @@ from .export import export_all_json
 from .gsc import inspect_url, is_quota_exceeded_error, status_bucket
 from .sitemap import fetch_sitemap_urls
 from .time_utils import (
+    IST,
     hour_bucket_ist,
     indexing_latency_minutes,
     midpoint_ist_iso,
@@ -80,7 +81,7 @@ def next_poll_interval_minutes(published_dt: Optional[dt.datetime], now: dt.date
     return 240
 
 
-def row_due_for_gsc(row: Dict[str, str], now: dt.datetime) -> bool:
+def row_due_for_gsc(row: Dict[str, str], now: dt.datetime, single_check_per_day: bool = False) -> bool:
     if row.get("current_status") == "Indexed":
         return False
 
@@ -88,10 +89,13 @@ def row_due_for_gsc(row: Dict[str, str], now: dt.datetime) -> bool:
     if next_check and now < next_check:
         return False
 
+    last_checked = parse_iso_datetime(row.get("last_checked_at", "") or "")
+    if single_check_per_day and last_checked and last_checked.astimezone(IST).date() == now.astimezone(IST).date():
+        return False
+
     if int(row.get("check_count", 0) or 0) == 0:
         return True
 
-    last_checked = parse_iso_datetime(row.get("last_checked_at", "") or "")
     if not last_checked:
         return True
 
@@ -198,7 +202,7 @@ def run_property_gsc(
         published_dt = parse_publication_datetime(row.get("sitemap_published_date", ""))
         if not published_dt or published_dt < cutoff_datetime:
             continue
-        if row_due_for_gsc(row, now):
+        if row_due_for_gsc(row, now, property_cfg.single_gsc_check_per_day):
             due_rows.append(row)
 
     for row in due_rows:

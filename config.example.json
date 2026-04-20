@@ -50,7 +50,9 @@
       "discovery_interval_minutes": 5,
       "sitemap_urls": [
         "https://www.herzindagi.com/your-picks/hindi/sitemap/article-sitemap.xml"
-      ]
+      ],
+      "allow_lastmod_fallback": true,
+      "single_gsc_check_per_day": true
     },
     {
       "key": "Herzindagi_C2C_Engish",
@@ -58,7 +60,9 @@
       "discovery_interval_minutes": 5,
       "sitemap_urls": [
         "https://www.herzindagi.com/your-picks/sitemap/article-sitemap.xml"
-      ]
+      ],
+      "allow_lastmod_fallback": true,
+      "single_gsc_check_per_day": true
     },
     {
       "key": "Jagran_C2C",
@@ -66,7 +70,9 @@
       "discovery_interval_minutes": 5,
       "sitemap_urls": [
         "https://www.jagran.com/smart-choice/sitemap/article-sitemap.xml"
-      ]
+      ],
+      "allow_lastmod_fallback": true,
+      "single_gsc_check_per_day": true
     },
     {
       "key": "TDJ_C2C",
@@ -74,7 +80,9 @@
       "discovery_interval_minutes": 5,
       "sitemap_urls": [
         "https://www.thedailyjagran.com/smart-guide/sitemap/article-sitemap.xml"
-      ]
+      ],
+      "allow_lastmod_fallback": true,
+      "single_gsc_check_per_day": true
     },
     {
       "key": "jagranreviews.com",
@@ -83,7 +91,8 @@
       "allow_lastmod_fallback": true,
       "sitemap_urls": [
         "https://www.jagranreviews.com/sitemap-articles.xml"
-      ]
+      ],
+      "single_gsc_check_per_day": true
     },
     {
       "key": "onlymyhealth.com_en",
