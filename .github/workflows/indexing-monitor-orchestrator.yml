@@ -1,6 +1,9 @@
-name: Indexing Monitor - thedailyjagran.com
+name: Indexing Monitor - Hourly Orchestrator
 
 on:
+  schedule:
+    # Runs at every IST hour boundary. GitHub cron is UTC, so :30 UTC = :00 IST.
+    - cron: '30 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -10,7 +13,7 @@ jobs:
   run-monitor:
     uses: ./.github/workflows/indexing-monitor-shared.yml
     with:
-      property: thedailyjagran.com
+      property: ''
       mode: all
       cutoff_datetime: ''
     secrets: inherit

@@ -1,8 +1,6 @@
 name: Indexing Monitor - jagran.com
 
 on:
-  schedule:
-    - cron: '0 * * * *'
   workflow_dispatch:
 
 permissions:

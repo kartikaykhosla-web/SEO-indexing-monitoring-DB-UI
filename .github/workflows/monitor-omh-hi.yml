@@ -1,8 +1,6 @@
 name: Indexing Monitor - onlymyhealth.com_hi
 
 on:
-  schedule:
-    - cron: '25 * * * *'
   workflow_dispatch:
 
 permissions:

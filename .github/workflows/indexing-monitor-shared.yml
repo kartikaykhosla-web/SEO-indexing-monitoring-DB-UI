@@ -4,8 +4,9 @@ on:
   workflow_call:
     inputs:
       property:
-        description: Property key to process
-        required: true
+        description: Optional property key to process. Empty means run all properties in config order.
+        required: false
+        default: ''
         type: string
       mode:
         description: Run mode

@@ -7,6 +7,34 @@
   "cutoff_datetime": "2026-04-18T11:00:00+05:30",
   "properties": [
     {
+      "key": "jagran.com",
+      "gsc_site_url": "https://www.jagran.com/",
+      "discovery_interval_minutes": 5,
+      "max_gsc_checks_per_hour": 25,
+      "max_new_urls_per_run": 25,
+      "sitemap_urls": [
+        "https://www.jagran.com/all-news-sitemap.xml"
+      ],
+      "max_gsc_checks_per_run": 25
+    },
+    {
+      "key": "jagranjosh.com",
+      "gsc_site_url": "https://www.jagranjosh.com/",
+      "discovery_interval_minutes": 5,
+      "max_gsc_checks_per_hour": 25,
+      "max_new_urls_per_run": 25,
+      "sitemap_urls": [
+        "https://www.jagranjosh.com/us/sitemaps/us-news-international.xml",
+        "https://www.jagranjosh.com/newsitemap-general-knowledge-english.xml",
+        "https://www.jagranjosh.com/newsitemap-articles-english.xml",
+        "https://www.jagranjosh.com/newsitemap-articles-hindi.xml",
+        "https://www.jagranjosh.com/college/news-college-articles.xml",
+        "https://www.jagranjosh.com/newsitemap-current-affairs-hindi.xml",
+        "https://www.jagranjosh.com/newsitemap-news-english.xml"
+      ],
+      "max_gsc_checks_per_run": 25
+    },
+    {
       "key": "thedailyjagran.com",
       "gsc_site_url": "https://www.thedailyjagran.com/",
       "discovery_interval_minutes": 5,
@@ -19,29 +47,28 @@
       ]
     },
     {
-      "key": "jagran.com",
-      "gsc_site_url": "https://www.jagran.com/",
+      "key": "TDJ_C2C",
+      "gsc_site_url": "https://www.thedailyjagran.com/",
       "discovery_interval_minutes": 5,
-      "max_gsc_checks_per_hour": 50,
-      "max_new_urls_per_run": 50,
       "sitemap_urls": [
-        "https://www.jagran.com/all-news-sitemap.xml"
+        "https://www.thedailyjagran.com/smart-guide/sitemap/article-sitemap.xml"
+      ],
+      "allow_lastmod_fallback": true
+    },
+    {
+      "key": "herzindagi.com_hi",
+      "gsc_site_url": "https://www.herzindagi.com/",
+      "discovery_interval_minutes": 5,
+      "sitemap_urls": [
+        "https://www.herzindagi.com/Resources/lifestyle/xmls/sitemap/news-sitemap-hi_IN.xml"
       ]
     },
     {
-      "key": "jagranjosh.com",
-      "gsc_site_url": "https://www.jagranjosh.com/",
+      "key": "herzindagi.com_en",
+      "gsc_site_url": "https://www.herzindagi.com/",
       "discovery_interval_minutes": 5,
-      "max_gsc_checks_per_hour": 50,
-      "max_new_urls_per_run": 50,
       "sitemap_urls": [
-        "https://www.jagranjosh.com/us/sitemaps/us-news-international.xml",
-        "https://www.jagranjosh.com/newsitemap-general-knowledge-english.xml",
-        "https://www.jagranjosh.com/newsitemap-articles-english.xml",
-        "https://www.jagranjosh.com/newsitemap-articles-hindi.xml",
-        "https://www.jagranjosh.com/college/news-college-articles.xml",
-        "https://www.jagranjosh.com/newsitemap-current-affairs-hindi.xml",
-        "https://www.jagranjosh.com/newsitemap-news-english.xml"
+        "https://www.herzindagi.com/Resources/lifestyle/xmls/sitemap/news-sitemap-en_US.xml"
       ]
     },
     {
@@ -51,8 +78,7 @@
       "sitemap_urls": [
         "https://www.herzindagi.com/your-picks/hindi/sitemap/article-sitemap.xml"
       ],
-      "allow_lastmod_fallback": true,
-      "single_gsc_check_per_day": true
+      "allow_lastmod_fallback": true
     },
     {
       "key": "Herzindagi_C2C_Engish",
@@ -61,8 +87,7 @@
       "sitemap_urls": [
         "https://www.herzindagi.com/your-picks/sitemap/article-sitemap.xml"
       ],
-      "allow_lastmod_fallback": true,
-      "single_gsc_check_per_day": true
+      "allow_lastmod_fallback": true
     },
     {
       "key": "Jagran_C2C",
@@ -71,18 +96,7 @@
       "sitemap_urls": [
         "https://www.jagran.com/smart-choice/sitemap/article-sitemap.xml"
       ],
-      "allow_lastmod_fallback": true,
-      "single_gsc_check_per_day": true
-    },
-    {
-      "key": "TDJ_C2C",
-      "gsc_site_url": "https://www.thedailyjagran.com/",
-      "discovery_interval_minutes": 5,
-      "sitemap_urls": [
-        "https://www.thedailyjagran.com/smart-guide/sitemap/article-sitemap.xml"
-      ],
-      "allow_lastmod_fallback": true,
-      "single_gsc_check_per_day": true
+      "allow_lastmod_fallback": true
     },
     {
       "key": "jagranreviews.com",
@@ -91,8 +105,7 @@
       "allow_lastmod_fallback": true,
       "sitemap_urls": [
         "https://www.jagranreviews.com/sitemap-articles.xml"
-      ],
-      "single_gsc_check_per_day": true
+      ]
     },
     {
       "key": "onlymyhealth.com_en",
@@ -108,22 +121,6 @@
       "discovery_interval_minutes": 5,
       "sitemap_urls": [
         "https://www.onlymyhealth.com/Resources/omh/xmls/news_sitemap/news-sitemap-hindi.xml"
-      ]
-    },
-    {
-      "key": "herzindagi.com_en",
-      "gsc_site_url": "https://www.herzindagi.com/",
-      "discovery_interval_minutes": 5,
-      "sitemap_urls": [
-        "https://www.herzindagi.com/Resources/lifestyle/xmls/sitemap/news-sitemap-en_US.xml"
-      ]
-    },
-    {
-      "key": "herzindagi.com_hi",
-      "gsc_site_url": "https://www.herzindagi.com/",
-      "discovery_interval_minutes": 5,
-      "sitemap_urls": [
-        "https://www.herzindagi.com/Resources/lifestyle/xmls/sitemap/news-sitemap-hi_IN.xml"
       ]
     }
   ],

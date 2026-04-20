@@ -1,8 +1,6 @@
 name: Indexing Monitor - Herzindagi_C2C_Hindi
 
 on:
-  schedule:
-    - cron: '50 * * * *'
   workflow_dispatch:
 
 permissions:

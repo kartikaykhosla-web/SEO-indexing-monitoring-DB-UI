@@ -1,8 +1,6 @@
 name: Indexing Monitor - TDJ_C2C
 
 on:
-  schedule:
-    - cron: '35 * * * *'
   workflow_dispatch:
 
 permissions:

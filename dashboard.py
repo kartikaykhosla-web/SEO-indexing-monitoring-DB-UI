@@ -17,20 +17,20 @@ from monitor import sheets as sheet_logger
 
 IST = timezone(timedelta(hours=5, minutes=30))
 SESSION_FILE_NAME = ".dashboard_session.json"
-PROPERTY_SCHEDULE_MINUTES = {
-    "thedailyjagran.com": 0,
-    "TDJ_C2C": 5,
-    "herzindagi.com_hi": 10,
-    "herzindagi.com_en": 15,
-    "Herzindagi_C2C_Hindi": 20,
-    "Herzindagi_C2C_Engish": 25,
-    "jagran.com": 30,
-    "Jagran_C2C": 35,
-    "jagranjosh.com": 40,
-    "jagranreviews.com": 45,
-    "onlymyhealth.com_en": 50,
-    "onlymyhealth.com_hi": 55,
-}
+PROPERTY_RUN_ORDER = [
+    "jagran.com",
+    "jagranjosh.com",
+    "thedailyjagran.com",
+    "TDJ_C2C",
+    "herzindagi.com_hi",
+    "herzindagi.com_en",
+    "Herzindagi_C2C_Hindi",
+    "Herzindagi_C2C_Engish",
+    "Jagran_C2C",
+    "jagranreviews.com",
+    "onlymyhealth.com_en",
+    "onlymyhealth.com_hi",
+]
 
 st.set_page_config(page_title="SEO Indexing Monitor (Local)", layout="wide")
 st.markdown(
@@ -208,12 +208,9 @@ def _format_timestamp_columns(df: pd.DataFrame, columns: List[str]) -> pd.DataFr
     return formatted.where(pd.notna(formatted), "")
 
 
-def _next_expected_run(property_key: str, reference: datetime | None = None) -> str:
-    minute = PROPERTY_SCHEDULE_MINUTES.get(property_key)
-    if minute is None:
-        return ""
+def _next_orchestrator_cycle(reference: datetime | None = None) -> str:
     current = (reference or _ist_now()).astimezone(IST).replace(second=0, microsecond=0)
-    candidate = current.replace(minute=minute)
+    candidate = current.replace(minute=0)
     if candidate <= current:
         candidate = candidate + timedelta(hours=1)
     return candidate.isoformat()
@@ -365,7 +362,8 @@ properties: List[str] = sorted({row["property_key"] for row in all_rows})
 if not properties:
     properties = [p.key for p in cfg.properties]
 
-known_properties = sorted({p.key for p in cfg.properties} | set(properties))
+config_property_order = [p.key for p in cfg.properties]
+known_properties = config_property_order + sorted(set(properties) - set(config_property_order))
 property_state_rows = {row["property_key"]: row for row in db.fetch_property_states(conn)}
 run_status_rows = []
 for property_name in known_properties:
@@ -378,8 +376,10 @@ for property_name in known_properties:
     run_status_rows.append(
         {
             "property_key": property_name,
+            "run_order": PROPERTY_RUN_ORDER.index(property_name) + 1 if property_name in PROPERTY_RUN_ORDER else "",
             "current_status": str(state.get("current_status", "idle") or "idle").lower(),
             "last_crawled_at": last_crawled_at,
+            "last_run_finished_at": state.get("last_run_finished_at", ""),
         }
     )
 
@@ -593,15 +593,14 @@ with url_state_tab:
 
 with run_status_tab:
     st.subheader("Run Status")
-    st.caption("Track which property is running right now and when each property last checked a URL.")
+    st.caption("Track the hourly sequential chain: Jagran starts first, then each property starts after the previous one finishes.")
     run_rows = list(run_status_rows)
     if property_key:
         run_rows = [row for row in run_rows if row["property_key"] == property_key]
     for row in run_rows:
         row["last_crawled_at_display"] = _format_ist(row.get("last_crawled_at", ""))
         row["last_run_finished_at_display"] = _format_ist(row.get("last_run_finished_at", ""))
-        row["next_expected_run"] = _next_expected_run(row.get("property_key", ""))
-        row["next_expected_run_display"] = _format_ist(row.get("next_expected_run", ""))
+        row["next_cycle_starts_display"] = _format_ist(_next_orchestrator_cycle())
         row["current_status_display"] = str(row.get("current_status", "idle")).title()
     run_rows.sort(
         key=lambda row: (
@@ -621,18 +620,20 @@ with run_status_tab:
         status_df = pd.DataFrame(run_rows)[
             [
                 "property_key",
+                "run_order",
                 "current_status_display",
                 "last_crawled_at_display",
                 "last_run_finished_at_display",
-                "next_expected_run_display",
+                "next_cycle_starts_display",
             ]
         ]
         status_df.columns = [
             "Property",
+            "Run Order",
             "Current Status",
             "Last Crawled At",
             "Last Run Finished At",
-            "Next Expected Run",
+            "Next Hourly Cycle Starts",
         ]
         st.dataframe(status_df, width="stretch", hide_index=True)
     else:

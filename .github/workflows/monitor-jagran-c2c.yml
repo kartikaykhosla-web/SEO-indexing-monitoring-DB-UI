@@ -1,8 +1,6 @@
 name: Indexing Monitor - Jagran_C2C
 
 on:
-  schedule:
-    - cron: '5 * * * *'
   workflow_dispatch:
 
 permissions:

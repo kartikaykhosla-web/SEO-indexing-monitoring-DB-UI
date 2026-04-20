@@ -11,8 +11,6 @@ from .export import export_all_json
 from .gsc import inspect_url, is_quota_exceeded_error, status_bucket
 from .sitemap import fetch_sitemap_urls
 from .time_utils import (
-    IST,
-    hour_bucket_ist,
     indexing_latency_minutes,
     midpoint_ist_iso,
     now_utc,
@@ -20,6 +18,18 @@ from .time_utils import (
     parse_publication_datetime,
     to_ist_iso,
 )
+
+ROLLING_GSC_WINDOW = dt.timedelta(hours=1)
+FRESH_RETRY_WINDOW = dt.timedelta(hours=2)
+FRESH_RETRY_INTERVAL_MINUTES = 5
+STALE_RETRY_INTERVAL_MINUTES = 240
+
+
+def rolling_quota_window_expired(window_start_value: str, now: dt.datetime) -> bool:
+    window_start = parse_iso_datetime(window_start_value or "")
+    if not window_start:
+        return True
+    return now - window_start >= ROLLING_GSC_WINDOW
 
 
 def property_discovery_due(state: Dict[str, str], interval_minutes: int, now: dt.datetime) -> bool:
@@ -40,10 +50,8 @@ def remaining_hourly_capacity(property_cfg: PropertyConfig, state: Dict[str, str
     hourly = property_cfg.max_gsc_checks_per_hour
     if not hourly:
         return None
-    bucket = hour_bucket_ist(now)
-    current_bucket = state.get("gsc_hour_bucket", "")
     count = int(state.get("gsc_checks_this_hour", 0) or 0)
-    if current_bucket != bucket:
+    if rolling_quota_window_expired(state.get("gsc_hour_bucket", ""), now):
         return hourly
     return max(0, hourly - count)
 
@@ -57,9 +65,8 @@ def can_run_gsc(property_cfg: PropertyConfig, state: Dict[str, str], now: dt.dat
 
 def increment_hourly_count(property_cfg: PropertyConfig, state: Dict[str, str], now: dt.datetime) -> Dict[str, str]:
     updated = dict(state)
-    bucket = hour_bucket_ist(now)
-    if updated.get("gsc_hour_bucket", "") != bucket:
-        updated["gsc_hour_bucket"] = bucket
+    if rolling_quota_window_expired(updated.get("gsc_hour_bucket", ""), now):
+        updated["gsc_hour_bucket"] = to_ist_iso(now)
         updated["gsc_checks_this_hour"] = 0
     updated["gsc_checks_this_hour"] = int(updated.get("gsc_checks_this_hour", 0) or 0) + 1
     updated["updated_at"] = to_ist_iso(now)
@@ -73,15 +80,13 @@ def set_quota_backoff(state: Dict[str, str], now: dt.datetime, minutes: int = 60
     return updated
 
 
-def next_poll_interval_minutes(published_dt: Optional[dt.datetime], now: dt.datetime) -> int:
-    if not published_dt:
-        return 240
-    if now - published_dt <= dt.timedelta(hours=1):
-        return 10
-    return 240
+def next_poll_interval_minutes(first_checked_dt: Optional[dt.datetime], now: dt.datetime) -> int:
+    if first_checked_dt and now - first_checked_dt <= FRESH_RETRY_WINDOW:
+        return FRESH_RETRY_INTERVAL_MINUTES
+    return STALE_RETRY_INTERVAL_MINUTES
 
 
-def row_due_for_gsc(row: Dict[str, str], now: dt.datetime, single_check_per_day: bool = False) -> bool:
+def row_due_for_gsc(row: Dict[str, str], now: dt.datetime) -> bool:
     if row.get("current_status") == "Indexed":
         return False
 
@@ -90,8 +95,6 @@ def row_due_for_gsc(row: Dict[str, str], now: dt.datetime, single_check_per_day:
         return False
 
     last_checked = parse_iso_datetime(row.get("last_checked_at", "") or "")
-    if single_check_per_day and last_checked and last_checked.astimezone(IST).date() == now.astimezone(IST).date():
-        return False
 
     if int(row.get("check_count", 0) or 0) == 0:
         return True
@@ -99,8 +102,8 @@ def row_due_for_gsc(row: Dict[str, str], now: dt.datetime, single_check_per_day:
     if not last_checked:
         return True
 
-    published_dt = parse_publication_datetime(row.get("sitemap_published_date", ""))
-    interval = next_poll_interval_minutes(published_dt, now)
+    first_checked = parse_iso_datetime(row.get("first_checked_at", "") or "")
+    interval = next_poll_interval_minutes(first_checked, now)
     return (now - last_checked) >= dt.timedelta(minutes=interval)
 
 
@@ -202,7 +205,7 @@ def run_property_gsc(
         published_dt = parse_publication_datetime(row.get("sitemap_published_date", ""))
         if not published_dt or published_dt < cutoff_datetime:
             continue
-        if row_due_for_gsc(row, now, property_cfg.single_gsc_check_per_day):
+        if row_due_for_gsc(row, now):
             due_rows.append(row)
 
     for row in due_rows:
@@ -234,7 +237,7 @@ def run_property_gsc(
 
         next_check_at = ""
         if current_status != "Indexed":
-            interval = next_poll_interval_minutes(parse_publication_datetime(published), now)
+            interval = next_poll_interval_minutes(parse_iso_datetime(first_checked), now)
             next_check_at = to_ist_iso(now + dt.timedelta(minutes=interval))
 
         db.update_url_state(
