@@ -179,8 +179,15 @@ def _ist_now() -> datetime:
 
 
 def _format_ist(value: str) -> str:
-    raw = str(value or "").strip()
-    if not raw:
+    if value is None:
+        return ""
+    try:
+        if pd.isna(value):
+            return ""
+    except TypeError:
+        pass
+    raw = str(value).strip()
+    if not raw or raw.lower() in {"nan", "nat", "none", "null"}:
         return ""
     try:
         parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
@@ -198,7 +205,7 @@ def _format_timestamp_columns(df: pd.DataFrame, columns: List[str]) -> pd.DataFr
     for column in columns:
         if column in formatted.columns:
             formatted[column] = formatted[column].map(_format_ist)
-    return formatted
+    return formatted.where(pd.notna(formatted), "")
 
 
 def _next_expected_run(property_key: str, reference: datetime | None = None) -> str:
@@ -534,6 +541,7 @@ with url_state_tab:
                 "sitemap_published_date",
                 "first_checked_at",
                 "last_checked_at",
+                "next_check_at",
                 "google_last_crawl_at",
             ],
         )
@@ -546,6 +554,7 @@ with url_state_tab:
             "check_count",
             "first_checked_at",
             "last_checked_at",
+            "next_check_at",
             "google_last_crawl_at",
             "indexing_latency_minutes",
             "gsc_coverage_state",
