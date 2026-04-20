@@ -2,18 +2,70 @@ name: Indexing Monitor - Hourly Orchestrator
 
 on:
   schedule:
-    # Runs at every IST hour boundary. GitHub cron is UTC, so :30 UTC = :00 IST.
+    # GitHub cron is UTC. :30 UTC = :00 IST, so this starts the hourly IST cycle.
     - cron: '30 * * * *'
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: indexing-monitor-hourly-orchestrator
+  cancel-in-progress: false
+
 jobs:
   run-monitor:
-    uses: ./.github/workflows/indexing-monitor-shared.yml
-    with:
-      property: ''
-      mode: all
-      cutoff_datetime: ''
-    secrets: inherit
+    name: Run sequential property chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Prepare runtime files
+        env:
+          GSC_SERVICE_ACCOUNT_JSON: ${{ secrets.GSC_SERVICE_ACCOUNT_JSON }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          temp_dir = Path(os.environ['RUNNER_TEMP'])
+          sa_path = temp_dir / 'gsc.json'
+          config_in = Path('config.github.json')
+          config_out = temp_dir / 'config.json'
+
+          gsc_json = os.environ.get('GSC_SERVICE_ACCOUNT_JSON', '').strip()
+          db_url = os.environ.get('SUPABASE_DB_URL', '').strip()
+          if not gsc_json:
+              raise SystemExit('Missing GitHub secret: GSC_SERVICE_ACCOUNT_JSON')
+          if not db_url:
+              raise SystemExit('Missing GitHub secret: SUPABASE_DB_URL')
+
+          sa_path.write_text(gsc_json, encoding='utf-8')
+          config = json.loads(config_in.read_text(encoding='utf-8'))
+          config['service_account_json_path'] = str(sa_path)
+          config['db_url'] = db_url
+          config_out.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding='utf-8')
+          print(f'Runtime config written to {config_out}')
+          print('Sequential property order:')
+          for index, prop in enumerate(config.get('properties', []), start=1):
+              print(f"{index}. {prop.get('key')}")
+          PY
+
+      - name: Run sequential indexing monitor
+        run: |
+          python run_monitor.py --config "$RUNNER_TEMP/config.json" --mode all
