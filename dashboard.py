@@ -563,6 +563,7 @@ url_state_tab, run_status_tab = st.tabs(["URL State", "Run Status"])
 
 with url_state_tab:
     st.subheader("URL State")
+    st.caption("The scheduler ticks every 15 minutes. Jagran and JagranJosh only become eligible again after a 60-minute gap.")
     if rows:
         df = pd.DataFrame(rows)
         df = _format_timestamp_columns(
