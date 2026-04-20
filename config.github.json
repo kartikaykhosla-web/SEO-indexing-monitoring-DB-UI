@@ -15,7 +15,8 @@
       "sitemap_urls": [
         "https://www.jagran.com/all-news-sitemap.xml"
       ],
-      "max_gsc_checks_per_run": 25
+      "max_gsc_checks_per_run": 25,
+      "min_run_interval_minutes": 60
     },
     {
       "key": "jagranjosh.com",
@@ -32,7 +33,8 @@
         "https://www.jagranjosh.com/newsitemap-current-affairs-hindi.xml",
         "https://www.jagranjosh.com/newsitemap-news-english.xml"
       ],
-      "max_gsc_checks_per_run": 25
+      "max_gsc_checks_per_run": 25,
+      "min_run_interval_minutes": 60
     },
     {
       "key": "thedailyjagran.com",

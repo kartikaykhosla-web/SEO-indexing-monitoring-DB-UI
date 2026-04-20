@@ -2,8 +2,7 @@ name: Indexing Monitor - Hourly Orchestrator
 
 on:
   schedule:
-    # GitHub scheduled jobs can be delayed or skipped. Check every 15 minutes,
-    # then use a DB-backed hourly gate so the full chain runs about once/hour.
+    # Keep the chain moving. Jagran/Josh are throttled inside the app.
     - cron: '*/15 * * * *'
   workflow_dispatch:
 
@@ -67,47 +66,6 @@ jobs:
               print(f"{index}. {prop.get('key')}")
           PY
 
-      - name: Check hourly run gate
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
-        run: |
-          python - <<'PY'
-          import os
-          from datetime import datetime, timedelta, timezone
-
-          import psycopg
-
-          # Manual runs should always run. The gate only throttles scheduled catch-up checks.
-          if os.environ.get('GITHUB_EVENT_NAME') == 'workflow_dispatch':
-              should_run = True
-              reason = 'Manual workflow dispatch bypasses hourly gate.'
-          else:
-              db_url = os.environ['SUPABASE_DB_URL']
-              now = datetime.now(timezone.utc)
-              with psycopg.connect(db_url) as conn:
-                  row = conn.execute('SELECT max(last_run_finished_at) FROM property_state').fetchone()
-              last_finished = row[0] if row else None
-              if last_finished and last_finished.tzinfo is None:
-                  last_finished = last_finished.replace(tzinfo=timezone.utc)
-              if last_finished and now - last_finished < timedelta(minutes=50):
-                  should_run = False
-                  reason = f'Skipping: last chain finished at {last_finished.isoformat()} UTC, less than 50 minutes ago.'
-              else:
-                  should_run = True
-                  reason = 'Running: no recent completed chain inside the 50-minute gate.'
-
-          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as handle:
-              handle.write(f'SHOULD_RUN_MONITOR={str(should_run).lower()}\n')
-          print(reason)
-          PY
-
       - name: Run sequential indexing monitor
-        if: env.SHOULD_RUN_MONITOR == 'true'
         run: |
           python run_monitor.py --config "$RUNNER_TEMP/config.json" --mode all
-
-      - name: Skip sequential indexing monitor
-        if: env.SHOULD_RUN_MONITOR != 'true'
-        run: |
-          echo "A recent successful chain already finished, so this catch-up scheduler tick is skipped."

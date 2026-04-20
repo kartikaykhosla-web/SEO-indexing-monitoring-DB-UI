@@ -15,6 +15,7 @@ class PropertyConfig:
     max_gsc_checks_per_hour: Optional[int] = None
     max_new_urls_per_run: Optional[int] = None
     max_gsc_checks_per_run: Optional[int] = None
+    min_run_interval_minutes: Optional[int] = None
     allow_lastmod_fallback: bool = False
     single_gsc_check_per_day: bool = False
 
@@ -54,6 +55,11 @@ def load_config(path: Path) -> MonitorConfig:
                 max_gsc_checks_per_run=(
                     int(item["max_gsc_checks_per_run"])
                     if item.get("max_gsc_checks_per_run") is not None
+                    else None
+                ),
+                min_run_interval_minutes=(
+                    int(item["min_run_interval_minutes"])
+                    if item.get("min_run_interval_minutes") is not None
                     else None
                 ),
                 allow_lastmod_fallback=bool(item.get("allow_lastmod_fallback", False)),

@@ -31,6 +31,7 @@ PROPERTY_RUN_ORDER = [
     "onlymyhealth.com_en",
     "onlymyhealth.com_hi",
 ]
+SCHEDULER_INTERVAL_MINUTES = 15
 
 st.set_page_config(page_title="SEO Indexing Monitor (Local)", layout="wide")
 st.markdown(
@@ -178,24 +179,29 @@ def _ist_now() -> datetime:
     return datetime.now(IST).replace(microsecond=0)
 
 
-def _format_ist(value: str) -> str:
+def _parse_dashboard_datetime(value: str) -> datetime | None:
     if value is None:
-        return ""
+        return None
     try:
         if pd.isna(value):
-            return ""
+            return None
     except TypeError:
         pass
     raw = str(value).strip()
     if not raw or raw.lower() in {"nan", "nat", "none", "null"}:
-        return ""
+        return None
     try:
         parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
         if parsed.tzinfo is None:
             parsed = parsed.replace(tzinfo=IST)
-        return parsed.astimezone(IST).replace(microsecond=0).isoformat()
+        return parsed.astimezone(IST).replace(microsecond=0)
     except Exception:
-        return raw
+        return None
+
+
+def _format_ist(value: str) -> str:
+    parsed = _parse_dashboard_datetime(value)
+    return parsed.isoformat() if parsed else ""
 
 
 def _format_timestamp_columns(df: pd.DataFrame, columns: List[str]) -> pd.DataFrame:
@@ -208,12 +214,31 @@ def _format_timestamp_columns(df: pd.DataFrame, columns: List[str]) -> pd.DataFr
     return formatted.where(pd.notna(formatted), "")
 
 
-def _next_orchestrator_cycle(reference: datetime | None = None) -> str:
+def _round_up_to_scheduler_tick(value: datetime) -> datetime:
+    current = value.astimezone(IST).replace(second=0, microsecond=0)
+    remainder = current.minute % SCHEDULER_INTERVAL_MINUTES
+    if remainder == 0:
+        return current
+    return current + timedelta(minutes=SCHEDULER_INTERVAL_MINUTES - remainder)
+
+
+def _next_scheduler_tick(reference: datetime | None = None) -> str:
     current = (reference or _ist_now()).astimezone(IST).replace(second=0, microsecond=0)
-    candidate = current.replace(minute=0)
-    if candidate <= current:
-        candidate = candidate + timedelta(hours=1)
+    candidate = _round_up_to_scheduler_tick(current + timedelta(minutes=1))
     return candidate.isoformat()
+
+
+def _next_property_eligible_run(last_finished_at: str, min_gap_minutes: int | None) -> str:
+    next_tick = _parse_dashboard_datetime(_next_scheduler_tick()) or _ist_now()
+    if not min_gap_minutes:
+        return next_tick.isoformat()
+    last_finished = _parse_dashboard_datetime(last_finished_at)
+    if not last_finished:
+        return next_tick.isoformat()
+    eligible_at = last_finished + timedelta(minutes=min_gap_minutes)
+    if eligible_at <= next_tick:
+        return next_tick.isoformat()
+    return _round_up_to_scheduler_tick(eligible_at).isoformat()
 
 
 def _normalize_username(username: str) -> tuple[str, str]:
@@ -363,11 +388,13 @@ if not properties:
     properties = [p.key for p in cfg.properties]
 
 config_property_order = [p.key for p in cfg.properties]
+property_config_by_key = {p.key: p for p in cfg.properties}
 known_properties = config_property_order + sorted(set(properties) - set(config_property_order))
 property_state_rows = {row["property_key"]: row for row in db.fetch_property_states(conn)}
 run_status_rows = []
 for property_name in known_properties:
     state = property_state_rows.get(property_name, {})
+    property_cfg = property_config_by_key.get(property_name)
     last_crawled_at = state.get("last_crawled_at", "")
     if not last_crawled_at:
         property_rows = [row for row in all_rows if row.get("property_key") == property_name]
@@ -380,6 +407,9 @@ for property_name in known_properties:
             "current_status": str(state.get("current_status", "idle") or "idle").lower(),
             "last_crawled_at": last_crawled_at,
             "last_run_finished_at": state.get("last_run_finished_at", ""),
+            "min_run_interval_minutes": (
+                property_cfg.min_run_interval_minutes if property_cfg else None
+            ),
         }
     )
 
@@ -593,14 +623,19 @@ with url_state_tab:
 
 with run_status_tab:
     st.subheader("Run Status")
-    st.caption("Track the hourly sequential chain: Jagran starts first, then each property starts after the previous one finishes.")
+    st.caption("The scheduler ticks every 15 minutes. Jagran and JagranJosh only become eligible again after a 60-minute gap.")
     run_rows = list(run_status_rows)
     if property_key:
         run_rows = [row for row in run_rows if row["property_key"] == property_key]
     for row in run_rows:
         row["last_crawled_at_display"] = _format_ist(row.get("last_crawled_at", ""))
         row["last_run_finished_at_display"] = _format_ist(row.get("last_run_finished_at", ""))
-        row["next_cycle_starts_display"] = _format_ist(_next_orchestrator_cycle())
+        row["next_eligible_run_display"] = _format_ist(
+            _next_property_eligible_run(
+                row.get("last_run_finished_at", ""),
+                row.get("min_run_interval_minutes"),
+            )
+        )
         row["current_status_display"] = str(row.get("current_status", "idle")).title()
     run_rows.sort(
         key=lambda row: (
@@ -624,7 +659,7 @@ with run_status_tab:
                 "current_status_display",
                 "last_crawled_at_display",
                 "last_run_finished_at_display",
-                "next_cycle_starts_display",
+                "next_eligible_run_display",
             ]
         ]
         status_df.columns = [
@@ -633,7 +668,7 @@ with run_status_tab:
             "Current Status",
             "Last Crawled At",
             "Last Run Finished At",
-            "Next Hourly Cycle Starts",
+            "Next Eligible Run",
         ]
         st.dataframe(status_df, width="stretch", hide_index=True)
     else:

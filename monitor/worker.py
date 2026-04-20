@@ -80,6 +80,16 @@ def set_quota_backoff(state: Dict[str, str], now: dt.datetime, minutes: int = 60
     return updated
 
 
+def property_run_due(property_cfg: PropertyConfig, state: Dict[str, str], now: dt.datetime) -> bool:
+    interval = property_cfg.min_run_interval_minutes
+    if not interval:
+        return True
+    last_finished = parse_iso_datetime(state.get("last_run_finished_at", "") or "")
+    if not last_finished:
+        return True
+    return now - last_finished >= dt.timedelta(minutes=interval)
+
+
 def next_poll_interval_minutes(first_checked_dt: Optional[dt.datetime], now: dt.datetime) -> int:
     if first_checked_dt and now - first_checked_dt <= FRESH_RETRY_WINDOW:
         return FRESH_RETRY_INTERVAL_MINUTES
@@ -316,6 +326,14 @@ def run_monitor(
         checked = 0
         indexed_now = 0
         state = db.get_property_state(conn, prop.key)
+        if not property_run_due(prop, state, now_utc()):
+            last_finished = to_ist_iso(parse_iso_datetime(state.get("last_run_finished_at", "")))
+            summaries.append(
+                f"{prop.key}: skipped_recent_run last_finished={last_finished} "
+                f"min_gap_minutes={prop.min_run_interval_minutes}"
+            )
+            continue
+
         run_started_at = to_ist_iso(now_utc())
         state.update(
             {
