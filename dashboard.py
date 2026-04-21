@@ -574,6 +574,9 @@ if latency_range_only:
         if _latency_in_range(row, int(min_latency), int(max_latency))
     ]
 
+if status_filter != "All":
+    base_rows = [row for row in base_rows if row.get("current_status") == status_filter]
+
 total_count = len(base_rows)
 indexed_count = sum(1 for row in base_rows if row.get("current_status") == "Indexed")
 error_count = sum(
@@ -601,8 +604,6 @@ c6.metric(f"Latency {latency_label}", late_indexed_count)
 c7.metric(f"{latency_label} %", f"{late_indexed_pct:.1f}%")
 
 rows = list(base_rows)
-if status_filter != "All":
-    rows = [r for r in rows if r.get("current_status") == status_filter]
 
 url_state_tab, run_status_tab = st.tabs(["URL State", "Run Status"])
 
