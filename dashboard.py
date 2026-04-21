@@ -604,7 +604,7 @@ url_state_tab, run_status_tab = st.tabs(["URL State", "Run Status"])
 
 with url_state_tab:
     st.subheader("URL State")
-    st.caption("The scheduler ticks every 15 minutes. Jagran and JagranJosh only become eligible again after a 60-minute gap.")
+    st.caption("The scheduler attempts to tick every 5 minutes. GitHub may delay/drop ticks; Jagran and JagranJosh only become eligible again after a 60-minute gap.")
     if rows:
         df = pd.DataFrame(rows)
         df = _format_timestamp_columns(
@@ -665,7 +665,7 @@ with url_state_tab:
 
 with run_status_tab:
     st.subheader("Run Status")
-    st.caption("The scheduler ticks every 15 minutes. Jagran and JagranJosh only become eligible again after a 60-minute gap.")
+    st.caption("The scheduler attempts to tick every 5 minutes. GitHub may delay/drop ticks; Jagran and JagranJosh only become eligible again after a 60-minute gap.")
     run_rows = list(run_status_rows)
     if property_key:
         run_rows = [row for row in run_rows if row["property_key"] == property_key]

@@ -2,8 +2,8 @@ name: Indexing Monitor - Hourly Orchestrator
 
 on:
   schedule:
-    # Keep the chain moving. Jagran/Josh are throttled inside the app.
-    - cron: '*/15 * * * *'
+    # GitHub scheduled workflows are best-effort, so tick frequently and let app gates throttle work.
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 permissions:
