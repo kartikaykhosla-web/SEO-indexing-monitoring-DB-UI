@@ -23,6 +23,10 @@ ROLLING_GSC_WINDOW = dt.timedelta(hours=1)
 FRESH_RETRY_WINDOW = dt.timedelta(hours=2)
 FRESH_RETRY_INTERVAL_MINUTES = 5
 STALE_RETRY_INTERVAL_MINUTES = 240
+TERMINAL_NON_INDEXED_STATUSES = {
+    "Blocked by robots.txt",
+    "Blocked by noindex",
+}
 
 
 def rolling_quota_window_expired(window_start_value: str, now: dt.datetime) -> bool:
@@ -98,6 +102,12 @@ def next_poll_interval_minutes(first_checked_dt: Optional[dt.datetime], now: dt.
 
 def row_due_for_gsc(row: Dict[str, str], now: dt.datetime) -> bool:
     if row.get("current_status") == "Indexed":
+        return False
+
+    if row.get("current_status") in TERMINAL_NON_INDEXED_STATUSES:
+        return False
+
+    if parse_iso_datetime(row.get("google_last_crawl_at", "") or ""):
         return False
 
     next_check = parse_iso_datetime(row.get("next_check_at", "") or "")
