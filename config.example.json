@@ -37,6 +37,54 @@
       "min_run_interval_minutes": 60
     },
     {
+      "key": "naidunia.com",
+      "gsc_site_url": "https://www.naidunia.com/",
+      "discovery_interval_minutes": 5,
+      "max_gsc_checks_per_hour": 25,
+      "max_new_urls_per_run": 25,
+      "sitemap_urls": [
+        "https://www.naidunia.com/news-sitemap-nd.xml"
+      ],
+      "max_gsc_checks_per_run": 25,
+      "min_run_interval_minutes": 60
+    },
+    {
+      "key": "gujaratijagran.com",
+      "gsc_site_url": "https://www.gujaratijagran.com/",
+      "discovery_interval_minutes": 5,
+      "max_gsc_checks_per_hour": 25,
+      "max_new_urls_per_run": 25,
+      "sitemap_urls": [
+        "https://www.gujaratijagran.com/sitemap-news.xml"
+      ],
+      "max_gsc_checks_per_run": 25,
+      "min_run_interval_minutes": 60
+    },
+    {
+      "key": "marathijagran.com",
+      "gsc_site_url": "https://www.marathijagran.com/",
+      "discovery_interval_minutes": 5,
+      "max_gsc_checks_per_hour": 25,
+      "max_new_urls_per_run": 25,
+      "sitemap_urls": [
+        "https://www.marathijagran.com/sitemap-news.xml"
+      ],
+      "max_gsc_checks_per_run": 25,
+      "min_run_interval_minutes": 60
+    },
+    {
+      "key": "punjabijagran.com",
+      "gsc_site_url": "https://www.punjabijagran.com/",
+      "discovery_interval_minutes": 5,
+      "max_gsc_checks_per_hour": 25,
+      "max_new_urls_per_run": 25,
+      "sitemap_urls": [
+        "https://www.punjabijagran.com/all-news-sitemap.xml"
+      ],
+      "max_gsc_checks_per_run": 25,
+      "min_run_interval_minutes": 60
+    },
+    {
       "key": "thedailyjagran.com",
       "gsc_site_url": "https://www.thedailyjagran.com/",
       "discovery_interval_minutes": 5,

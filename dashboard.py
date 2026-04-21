@@ -20,6 +20,10 @@ SESSION_FILE_NAME = ".dashboard_session.json"
 PROPERTY_RUN_ORDER = [
     "jagran.com",
     "jagranjosh.com",
+    "naidunia.com",
+    "gujaratijagran.com",
+    "marathijagran.com",
+    "punjabijagran.com",
     "thedailyjagran.com",
     "TDJ_C2C",
     "herzindagi.com_hi",
@@ -31,7 +35,7 @@ PROPERTY_RUN_ORDER = [
     "onlymyhealth.com_en",
     "onlymyhealth.com_hi",
 ]
-SCHEDULER_INTERVAL_MINUTES = 15
+SCHEDULER_INTERVAL_MINUTES = 5
 
 st.set_page_config(page_title="SEO Indexing Monitor (Local)", layout="wide")
 st.markdown(
