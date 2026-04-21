@@ -1,9 +1,6 @@
 name: Indexing Monitor - Hourly Orchestrator
 
 on:
-  schedule:
-    # GitHub scheduled workflows are best-effort, so tick frequently and let app gates throttle work.
-    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 permissions:
