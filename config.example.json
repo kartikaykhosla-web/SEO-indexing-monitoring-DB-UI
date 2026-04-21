@@ -50,7 +50,7 @@
     },
     {
       "key": "gujaratijagran.com",
-      "gsc_site_url": "https://www.gujaratijagran.com/",
+      "gsc_site_url": "sc-domain:gujaratijagran.com",
       "discovery_interval_minutes": 5,
       "max_gsc_checks_per_hour": 25,
       "max_new_urls_per_run": 25,
@@ -62,7 +62,7 @@
     },
     {
       "key": "marathijagran.com",
-      "gsc_site_url": "https://www.marathijagran.com/",
+      "gsc_site_url": "sc-domain:marathijagran.com",
       "discovery_interval_minutes": 5,
       "max_gsc_checks_per_hour": 25,
       "max_new_urls_per_run": 25,
