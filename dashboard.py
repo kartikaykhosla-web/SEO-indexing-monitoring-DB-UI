@@ -507,7 +507,7 @@ with filter_row2_col2:
         min_latency = st.number_input(
             "Min",
             min_value=0,
-            value=5,
+            value=0,
             step=1,
             key="min_latency",
         )
@@ -515,10 +515,10 @@ with filter_row2_col2:
         max_latency = st.number_input(
             "Max",
             min_value=0,
-            value=0,
+            value=5,
             step=1,
             key="max_latency",
-            help="Keep 0 for no upper limit.",
+            help="Set Max to 0 for no upper limit.",
         )
 
 with filter_row2_col3:
