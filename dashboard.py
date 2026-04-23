@@ -10,12 +10,19 @@ from typing import List
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
+
+try:
+    from streamlit_autorefresh import st_autorefresh
+except ImportError:  # pragma: no cover - local fallback if dependency is not installed yet
+    st_autorefresh = None
 
 from monitor import db
 from monitor.config import load_config
 from monitor import sheets as sheet_logger
 
 IST = timezone(timedelta(hours=5, minutes=30))
+AUTO_REFRESH_INTERVAL_MS = 5 * 60 * 1000
 SESSION_FILE_NAME = ".dashboard_session.json"
 PROPERTY_RUN_ORDER = [
     "jagran.com",
@@ -38,6 +45,13 @@ PROPERTY_RUN_ORDER = [
 SCHEDULER_INTERVAL_MINUTES = 5
 
 st.set_page_config(page_title="SEO Indexing Monitor (Local)", layout="wide")
+if st_autorefresh:
+    st_autorefresh(interval=AUTO_REFRESH_INTERVAL_MS, key="seo_indexing_monitor_autorefresh")
+else:
+    components.html(
+        f"<script>setTimeout(function() {{ window.parent.location.reload(); }}, {AUTO_REFRESH_INTERVAL_MS});</script>",
+        height=0,
+    )
 st.markdown(
     """
     <style>
