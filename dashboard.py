@@ -596,13 +596,6 @@ if min_check_count > 0:
         if int(row.get("check_count", 0) or 0) >= int(min_check_count)
     ]
 
-if coverage_state_filter != "All":
-    base_rows = [
-        row
-        for row in base_rows
-        if str(row.get("gsc_coverage_state", "")).strip() == coverage_state_filter
-    ]
-
 if latency_range_only:
     base_rows = [
         row
@@ -612,6 +605,14 @@ if latency_range_only:
 
 if status_filter != "All":
     base_rows = [row for row in base_rows if row.get("current_status") == status_filter]
+
+coverage_tab_rows = list(base_rows)
+if coverage_state_filter != "All":
+    base_rows = [
+        row
+        for row in coverage_tab_rows
+        if str(row.get("gsc_coverage_state", "")).strip() == coverage_state_filter
+    ]
 
 total_count = len(base_rows)
 indexed_count = sum(1 for row in base_rows if row.get("current_status") == "Indexed")
@@ -629,13 +630,8 @@ late_indexed_count = sum(
     if _latency_in_range(row, int(min_latency), int(max_latency))
 )
 late_indexed_pct = (late_indexed_count / indexed_count * 100) if indexed_count else 0.0
-coverage_match_count = (
-    total_count
-    if coverage_state_filter != "All"
-    else sum(1 for row in base_rows if str(row.get("gsc_coverage_state", "")).strip())
-)
 
-c1, c2, c3, c4, c5, c6, c7, c8 = st.columns(8)
+c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
 c1.metric("Total URLs", total_count)
 c2.metric("Indexed", indexed_count)
 c3.metric("Not Indexed", not_indexed_count)
@@ -643,17 +639,20 @@ c4.metric("Indexed %", f"{indexed_pct:.1f}%")
 c5.metric("Errors", error_count)
 c6.metric(f"Latency {latency_label}", late_indexed_count)
 c7.metric(f"{latency_label} %", f"{late_indexed_pct:.1f}%")
-c8.metric("Coverage Count", coverage_match_count)
 
 rows = list(base_rows)
+coverage_tab_values = sorted(
+    {
+        str(row.get("gsc_coverage_state", "")).strip()
+        for row in coverage_tab_rows
+        if str(row.get("gsc_coverage_state", "")).strip()
+    }
+)
 
-url_state_tab, run_status_tab = st.tabs(["URL State", "Run Status"])
-
-with url_state_tab:
-    st.subheader("URL State")
-    st.caption("The scheduler attempts to tick every 5 minutes. GitHub may delay/drop ticks; Jagran and JagranJosh only become eligible again after a 60-minute gap.")
-    if rows:
-        df = pd.DataFrame(rows)
+def _render_url_rows(display_rows, *, log_key_suffix: str, show_logs: bool = False, show_recent_logs: bool = False) -> None:
+    if display_rows:
+        st.caption(f"URL count: {len(display_rows)}")
+        df = pd.DataFrame(display_rows)
         df = _format_timestamp_columns(
             df,
             [
@@ -682,33 +681,61 @@ with url_state_tab:
         show_cols = [c for c in show_cols if c in df.columns]
         st.dataframe(df[show_cols], width="stretch", hide_index=True)
 
-        urls = [r["url"] for r in rows]
-        chosen_url = st.selectbox("Inspect logs for URL", options=["(none)"] + urls, index=0)
+        if show_logs:
+            urls = [r["url"] for r in display_rows]
+            chosen_url = st.selectbox(
+                "Inspect logs for URL",
+                options=["(none)"] + urls,
+                index=0,
+                key=f"inspect_url_{log_key_suffix}",
+            )
 
-        if chosen_url != "(none)":
-            logs = db.fetch_logs(conn, property_key=property_key, url=chosen_url, limit=500)
-            st.subheader("Check Logs")
-            if logs:
-                logs_df = _format_timestamp_columns(
-                    pd.DataFrame(logs),
-                    ["checked_at", "last_crawl_time", "created_at"],
-                )
-                st.dataframe(logs_df, width="stretch", hide_index=True)
-            else:
-                st.info("No checks logged yet for this URL.")
+            if chosen_url != "(none)":
+                logs = db.fetch_logs(conn, property_key=property_key, url=chosen_url, limit=500)
+                st.subheader("Check Logs")
+                if logs:
+                    logs_df = _format_timestamp_columns(
+                        pd.DataFrame(logs),
+                        ["checked_at", "last_crawl_time", "created_at"],
+                    )
+                    st.dataframe(logs_df, width="stretch", hide_index=True)
+                else:
+                    st.info("No checks logged yet for this URL.")
     else:
         st.info("No rows found for the current filter.")
 
-    st.subheader("Recent Logs")
-    recent_logs = db.fetch_logs(conn, property_key=property_key, limit=200)
-    if recent_logs:
-        recent_logs_df = _format_timestamp_columns(
-            pd.DataFrame(recent_logs),
-            ["checked_at", "last_crawl_time", "created_at"],
-        )
-        st.dataframe(recent_logs_df, width="stretch", hide_index=True)
-    else:
-        st.info("No logs yet.")
+    if show_recent_logs:
+        st.subheader("Recent Logs")
+        recent_logs = db.fetch_logs(conn, property_key=property_key, limit=200)
+        if recent_logs:
+            recent_logs_df = _format_timestamp_columns(
+                pd.DataFrame(recent_logs),
+                ["checked_at", "last_crawl_time", "created_at"],
+            )
+            st.dataframe(recent_logs_df, width="stretch", hide_index=True)
+        else:
+            st.info("No logs yet.")
+
+tab_labels = ["URL State"] + coverage_tab_values + ["Run Status"]
+tabs = st.tabs(tab_labels)
+url_state_tab = tabs[0]
+coverage_tabs = list(zip(coverage_tab_values, tabs[1:-1]))
+run_status_tab = tabs[-1]
+
+with url_state_tab:
+    st.subheader("URL State")
+    st.caption("The scheduler attempts to tick every 5 minutes. GitHub may delay/drop ticks; Jagran and JagranJosh only become eligible again after a 60-minute gap.")
+    _render_url_rows(rows, log_key_suffix="url_state", show_logs=True, show_recent_logs=True)
+
+for index, (coverage_value, coverage_tab) in enumerate(coverage_tabs, start=1):
+    with coverage_tab:
+        st.subheader(coverage_value)
+        coverage_rows = [
+            row
+            for row in coverage_tab_rows
+            if str(row.get("gsc_coverage_state", "")).strip() == coverage_value
+        ]
+        _render_url_rows(coverage_rows, log_key_suffix=f"coverage_{index}")
 
 with run_status_tab:
     st.subheader("Run Status")
