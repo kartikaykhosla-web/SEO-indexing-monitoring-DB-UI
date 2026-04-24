@@ -452,7 +452,7 @@ for property_name in known_properties:
         }
     )
 
-filter_row1_col1, filter_row1_col2, filter_row1_col3, filter_row1_col4 = st.columns([1.0, 1.0, 1.45, 1.2])
+filter_row1_col1, filter_row1_col2, filter_row1_col3, filter_row1_col4, filter_row1_col5 = st.columns([1.0, 1.0, 1.25, 1.45, 1.15])
 filter_row2_col1, filter_row2_col2, filter_row2_col3 = st.columns([1.0, 1.0, 1.2])
 
 with filter_row1_col1:
@@ -474,6 +474,21 @@ with filter_row1_col2:
         index=0,
     )
 
+coverage_states = sorted(
+    {
+        str(row.get("gsc_coverage_state", "")).strip()
+        for row in all_rows
+        if str(row.get("gsc_coverage_state", "")).strip()
+    }
+)
+
+with filter_row1_col3:
+    coverage_state_filter = st.selectbox(
+        "GSC Coverage State",
+        options=["All"] + coverage_states,
+        index=0,
+    )
+
 available_dates = sorted({row["_date_obj"] for row in all_rows if row.get("_date_obj")})
 date_range = None
 if available_dates:
@@ -489,7 +504,7 @@ if available_dates:
     if current_anchor != desired_anchor:
         st.session_state[date_range_key] = (default_start, default_end)
         st.session_state[date_range_anchor_key] = desired_anchor
-    with filter_row1_col3:
+    with filter_row1_col4:
         date_range = st.date_input(
             "Date Range",
             value=st.session_state.get(date_range_key, (default_start, default_end)),
@@ -498,7 +513,7 @@ if available_dates:
             key=date_range_key,
         )
 
-with filter_row1_col4:
+with filter_row1_col5:
     url_pattern = st.text_input(
         "URL Pattern",
         value="",
@@ -581,6 +596,13 @@ if min_check_count > 0:
         if int(row.get("check_count", 0) or 0) >= int(min_check_count)
     ]
 
+if coverage_state_filter != "All":
+    base_rows = [
+        row
+        for row in base_rows
+        if str(row.get("gsc_coverage_state", "")).strip() == coverage_state_filter
+    ]
+
 if latency_range_only:
     base_rows = [
         row
@@ -607,8 +629,13 @@ late_indexed_count = sum(
     if _latency_in_range(row, int(min_latency), int(max_latency))
 )
 late_indexed_pct = (late_indexed_count / indexed_count * 100) if indexed_count else 0.0
+coverage_match_count = (
+    total_count
+    if coverage_state_filter != "All"
+    else sum(1 for row in base_rows if str(row.get("gsc_coverage_state", "")).strip())
+)
 
-c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
+c1, c2, c3, c4, c5, c6, c7, c8 = st.columns(8)
 c1.metric("Total URLs", total_count)
 c2.metric("Indexed", indexed_count)
 c3.metric("Not Indexed", not_indexed_count)
@@ -616,6 +643,7 @@ c4.metric("Indexed %", f"{indexed_pct:.1f}%")
 c5.metric("Errors", error_count)
 c6.metric(f"Latency {latency_label}", late_indexed_count)
 c7.metric(f"{latency_label} %", f"{late_indexed_pct:.1f}%")
+c8.metric("Coverage Count", coverage_match_count)
 
 rows = list(base_rows)
 
