@@ -43,6 +43,7 @@ PROPERTY_RUN_ORDER = [
     "onlymyhealth.com_hi",
 ]
 SCHEDULER_INTERVAL_MINUTES = 5
+DASHBOARD_MAX_ROWS = int(os.environ.get("DASHBOARD_MAX_ROWS", "5000") or "5000")
 
 st.set_page_config(page_title="SEO Indexing Monitor (Local)", layout="wide")
 if st_autorefresh:
@@ -417,28 +418,20 @@ db.init_db(conn)
 logged_in_username, logged_in_at = require_login(conn, cfg)
 render_account_panel(conn, cfg, logged_in_username, logged_in_at)
 
-all_rows = db.fetch_all_summary(conn)
-for row in all_rows:
-    parsed_date = pd.to_datetime(row.get("date", ""), errors="coerce")
-    row["_date_obj"] = parsed_date.date() if not pd.isna(parsed_date) else None
-
-properties: List[str] = sorted({row["property_key"] for row in all_rows})
-if not properties:
-    properties = [p.key for p in cfg.properties]
-
 config_property_order = [p.key for p in cfg.properties]
 property_config_by_key = {p.key: p for p in cfg.properties}
+stored_properties = db.fetch_summary_property_keys(conn)
+properties: List[str] = config_property_order + sorted(set(stored_properties) - set(config_property_order))
+if not properties:
+    properties = [p.key for p in cfg.properties]
 known_properties = config_property_order + sorted(set(properties) - set(config_property_order))
 property_state_rows = {row["property_key"]: row for row in db.fetch_property_states(conn)}
+latest_checked_by_property = db.fetch_latest_checked_at_by_property(conn)
 run_status_rows = []
 for property_name in known_properties:
     state = property_state_rows.get(property_name, {})
     property_cfg = property_config_by_key.get(property_name)
-    last_crawled_at = state.get("last_crawled_at", "")
-    if not last_crawled_at:
-        property_rows = [row for row in all_rows if row.get("property_key") == property_name]
-        timestamps = [str(row.get("last_checked_at", "")).strip() for row in property_rows if str(row.get("last_checked_at", "")).strip()]
-        last_crawled_at = max(timestamps) if timestamps else ""
+    last_crawled_at = state.get("last_crawled_at", "") or latest_checked_by_property.get(property_name, "")
     run_status_rows.append(
         {
             "property_key": property_name,
@@ -458,6 +451,8 @@ filter_row2_col1, filter_row2_col2, filter_row2_col3 = st.columns([1.0, 1.0, 1.2
 with filter_row1_col1:
     selected_property = st.selectbox("Property", options=["All"] + properties, index=0)
 
+property_key = None if selected_property == "All" else selected_property
+
 with filter_row1_col2:
     status_filter = st.selectbox(
         "Status",
@@ -474,22 +469,12 @@ with filter_row1_col2:
         index=0,
     )
 
-coverage_states = sorted(
-    {
-        str(row.get("gsc_coverage_state", "")).strip()
-        for row in all_rows
-        if str(row.get("gsc_coverage_state", "")).strip()
-    }
-)
+available_dates = []
+for date_value in db.fetch_summary_dates(conn, property_key=property_key):
+    parsed_date = pd.to_datetime(date_value, errors="coerce")
+    if not pd.isna(parsed_date):
+        available_dates.append(parsed_date.date())
 
-with filter_row1_col3:
-    coverage_state_filter = st.selectbox(
-        "GSC Coverage State",
-        options=["All"] + coverage_states,
-        index=0,
-    )
-
-available_dates = sorted({row["_date_obj"] for row in all_rows if row.get("_date_obj")})
 date_range = None
 if available_dates:
     today_ist = _ist_now().date()
@@ -500,7 +485,7 @@ if available_dates:
     date_range_key = "date_range_filter"
     date_range_anchor_key = "date_range_filter_anchor"
     current_anchor = st.session_state.get(date_range_anchor_key)
-    desired_anchor = default_end.isoformat()
+    desired_anchor = f"{selected_property}:{default_start.isoformat()}:{default_end.isoformat()}"
     if current_anchor != desired_anchor:
         st.session_state[date_range_key] = (default_start, default_end)
         st.session_state[date_range_anchor_key] = desired_anchor
@@ -512,6 +497,27 @@ if available_dates:
             max_value=available_dates[-1],
             key=date_range_key,
         )
+
+date_start_value = date_end_value = None
+if available_dates and date_range:
+    if isinstance(date_range, tuple) and len(date_range) == 2:
+        date_start_value, date_end_value = date_range
+    else:
+        date_start_value = date_end_value = date_range
+
+coverage_states = db.fetch_coverage_states(
+    conn,
+    property_key=property_key,
+    start_date=date_start_value.isoformat() if date_start_value else None,
+    end_date=date_end_value.isoformat() if date_end_value else None,
+)
+
+with filter_row1_col3:
+    coverage_state_filter = st.selectbox(
+        "GSC Coverage State",
+        options=["All"] + coverage_states,
+        index=0,
+    )
 
 with filter_row1_col5:
     url_pattern = st.text_input(
@@ -561,24 +567,28 @@ with filter_row2_col3:
         ),
     )
 
-property_key = None if selected_property == "All" else selected_property
 if max_latency > 0 and max_latency < min_latency:
     st.warning("Max latency is lower than Min latency, so the latency range will not match any URLs.")
 
-base_rows = all_rows
-if property_key:
-    base_rows = [row for row in base_rows if row["property_key"] == property_key]
-
-if available_dates and date_range:
-    if isinstance(date_range, tuple) and len(date_range) == 2:
-        start_date, end_date = date_range
-    else:
-        start_date = end_date = date_range
-    base_rows = [
-        row
-        for row in base_rows
-        if row.get("_date_obj") and start_date <= row["_date_obj"] <= end_date
-    ]
+query_status = None if status_filter == "All" else status_filter
+query_coverage_state = None if coverage_state_filter == "All" else coverage_state_filter
+base_rows = db.fetch_summary_filtered(
+    conn,
+    property_key=property_key,
+    start_date=date_start_value.isoformat() if date_start_value else None,
+    end_date=date_end_value.isoformat() if date_end_value else None,
+    status=query_status,
+    coverage_state=query_coverage_state,
+    min_check_count=int(min_check_count),
+    limit=DASHBOARD_MAX_ROWS + 1,
+)
+rows_truncated = len(base_rows) > DASHBOARD_MAX_ROWS
+if rows_truncated:
+    base_rows = base_rows[:DASHBOARD_MAX_ROWS]
+    st.warning(
+        f"Showing the first {DASHBOARD_MAX_ROWS:,} rows for the current filters. "
+        "Narrow the date range, property, status, or URL pattern for a complete table."
+    )
 
 if url_pattern.strip():
     patterns = [part.strip().lower() for part in re.split(r"[\n,]+", url_pattern) if part.strip()]
@@ -589,13 +599,6 @@ if url_pattern.strip():
             if any(pattern in str(row.get("url", "")).lower() for pattern in patterns)
         ]
 
-if min_check_count > 0:
-    base_rows = [
-        row
-        for row in base_rows
-        if int(row.get("check_count", 0) or 0) >= int(min_check_count)
-    ]
-
 if latency_range_only:
     base_rows = [
         row
@@ -603,16 +606,7 @@ if latency_range_only:
         if _latency_in_range(row, int(min_latency), int(max_latency))
     ]
 
-if status_filter != "All":
-    base_rows = [row for row in base_rows if row.get("current_status") == status_filter]
-
 coverage_tab_rows = list(base_rows)
-if coverage_state_filter != "All":
-    base_rows = [
-        row
-        for row in coverage_tab_rows
-        if str(row.get("gsc_coverage_state", "")).strip() == coverage_state_filter
-    ]
 
 total_count = len(base_rows)
 indexed_count = sum(1 for row in base_rows if row.get("current_status") == "Indexed")

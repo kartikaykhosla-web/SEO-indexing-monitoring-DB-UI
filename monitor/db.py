@@ -76,8 +76,13 @@ CREATE TABLE IF NOT EXISTS login_events (
 
 CREATE INDEX IF NOT EXISTS idx_url_state_property_status ON url_state(property_key, current_status);
 CREATE INDEX IF NOT EXISTS idx_url_state_property_published ON url_state(property_key, sitemap_published_date);
+CREATE INDEX IF NOT EXISTS idx_url_state_property_date ON url_state(property_key, date);
+CREATE INDEX IF NOT EXISTS idx_url_state_date ON url_state(date);
+CREATE INDEX IF NOT EXISTS idx_url_state_property_coverage ON url_state(property_key, gsc_coverage_state);
+CREATE INDEX IF NOT EXISTS idx_url_state_property_last_checked ON url_state(property_key, last_checked_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_url_state_property_url_unique ON url_state(property_key, url);
 CREATE INDEX IF NOT EXISTS idx_check_log_property_checked ON check_log(property_key, checked_at);
+CREATE INDEX IF NOT EXISTS idx_check_log_property_url_checked ON check_log(property_key, url, checked_at);
 CREATE INDEX IF NOT EXISTS idx_login_events_logged_in_at ON login_events(logged_in_at DESC);
 """
 
@@ -156,7 +161,12 @@ POSTGRES_SCHEMA_STATEMENTS = [
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_url_state_property_url_unique ON url_state(property_key, url)",
     "CREATE INDEX IF NOT EXISTS idx_url_state_property_status ON url_state(property_key, current_status)",
     "CREATE INDEX IF NOT EXISTS idx_url_state_property_published ON url_state(property_key, sitemap_published_date)",
+    "CREATE INDEX IF NOT EXISTS idx_url_state_property_date ON url_state(property_key, date)",
+    "CREATE INDEX IF NOT EXISTS idx_url_state_date ON url_state(date)",
+    "CREATE INDEX IF NOT EXISTS idx_url_state_property_coverage ON url_state(property_key, gsc_coverage_state)",
+    "CREATE INDEX IF NOT EXISTS idx_url_state_property_last_checked ON url_state(property_key, last_checked_at)",
     "CREATE INDEX IF NOT EXISTS idx_check_log_property_checked ON check_log(property_key, checked_at)",
+    "CREATE INDEX IF NOT EXISTS idx_check_log_property_url_checked ON check_log(property_key, url, checked_at)",
     "CREATE INDEX IF NOT EXISTS idx_login_events_logged_in_at ON login_events(logged_in_at DESC)",
 ]
 
@@ -446,6 +456,140 @@ def fetch_all_summary(conn: DBConnection, property_key: Optional[str] = None) ->
             "SELECT * FROM url_state ORDER BY property_key ASC, sitemap_published_date DESC, id DESC",
         )
     )
+
+
+def fetch_summary_property_keys(conn: DBConnection) -> List[str]:
+    rows = _fetchall_dicts(
+        _execute(
+            conn,
+            """
+            SELECT DISTINCT property_key
+            FROM url_state
+            ORDER BY property_key ASC
+            """,
+        )
+    )
+    return [str(row.get("property_key", "")) for row in rows if row.get("property_key")]
+
+
+def fetch_summary_dates(conn: DBConnection, property_key: Optional[str] = None) -> List[str]:
+    params: List[Any] = []
+    where = ""
+    if property_key:
+        where = "WHERE property_key = ?"
+        params.append(property_key)
+    rows = _fetchall_dicts(
+        _execute(
+            conn,
+            f"""
+            SELECT DISTINCT date
+            FROM url_state
+            {where}
+            ORDER BY date ASC
+            """,
+            params,
+        )
+    )
+    return [str(row.get("date", "")) for row in rows if row.get("date")]
+
+
+def fetch_coverage_states(
+    conn: DBConnection,
+    property_key: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+) -> List[str]:
+    where_parts: List[str] = []
+    params: List[Any] = []
+    if property_key:
+        where_parts.append("property_key = ?")
+        params.append(property_key)
+    if start_date:
+        where_parts.append("date >= ?")
+        params.append(start_date)
+    if end_date:
+        where_parts.append("date <= ?")
+        params.append(end_date)
+    where = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
+    rows = _fetchall_dicts(
+        _execute(
+            conn,
+            f"""
+            SELECT DISTINCT gsc_coverage_state
+            FROM url_state
+            {where}
+            ORDER BY gsc_coverage_state ASC
+            """,
+            params,
+        )
+    )
+    return [
+        str(row.get("gsc_coverage_state", "")).strip()
+        for row in rows
+        if str(row.get("gsc_coverage_state", "")).strip()
+    ]
+
+
+def fetch_latest_checked_at_by_property(conn: DBConnection) -> Dict[str, str]:
+    rows = _fetchall_dicts(
+        _execute(
+            conn,
+            """
+            SELECT property_key, MAX(last_checked_at) AS last_checked_at
+            FROM url_state
+            WHERE last_checked_at IS NOT NULL
+            GROUP BY property_key
+            """,
+        )
+    )
+    return {
+        str(row.get("property_key", "")): str(row.get("last_checked_at", "") or "")
+        for row in rows
+        if row.get("property_key")
+    }
+
+
+def fetch_summary_filtered(
+    conn: DBConnection,
+    property_key: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    status: Optional[str] = None,
+    coverage_state: Optional[str] = None,
+    min_check_count: int = 0,
+    limit: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    where_parts: List[str] = []
+    params: List[Any] = []
+    if property_key:
+        where_parts.append("property_key = ?")
+        params.append(property_key)
+    if start_date:
+        where_parts.append("date >= ?")
+        params.append(start_date)
+    if end_date:
+        where_parts.append("date <= ?")
+        params.append(end_date)
+    if status:
+        where_parts.append("current_status = ?")
+        params.append(status)
+    if coverage_state:
+        where_parts.append("gsc_coverage_state = ?")
+        params.append(coverage_state)
+    if min_check_count > 0:
+        where_parts.append("check_count >= ?")
+        params.append(int(min_check_count))
+    where = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
+    query = f"""
+        SELECT *
+        FROM url_state
+        {where}
+        ORDER BY property_key ASC, sitemap_published_date DESC, id DESC
+    """
+    if limit is not None:
+        query += " LIMIT ?"
+        params.append(int(limit))
+    return _fetchall_dicts(_execute(conn, query, params))
 
 
 def fetch_property_states(conn: DBConnection) -> List[Dict[str, Any]]:
