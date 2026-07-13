@@ -80,6 +80,7 @@ CREATE INDEX IF NOT EXISTS idx_url_state_property_date ON url_state(property_key
 CREATE INDEX IF NOT EXISTS idx_url_state_date ON url_state(date);
 CREATE INDEX IF NOT EXISTS idx_url_state_property_coverage ON url_state(property_key, gsc_coverage_state);
 CREATE INDEX IF NOT EXISTS idx_url_state_property_last_checked ON url_state(property_key, last_checked_at);
+CREATE INDEX IF NOT EXISTS idx_url_state_property_next_check ON url_state(property_key, current_status, next_check_at);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_url_state_property_url_unique ON url_state(property_key, url);
 CREATE INDEX IF NOT EXISTS idx_check_log_property_checked ON check_log(property_key, checked_at);
 CREATE INDEX IF NOT EXISTS idx_check_log_property_url_checked ON check_log(property_key, url, checked_at);
@@ -165,6 +166,7 @@ POSTGRES_SCHEMA_STATEMENTS = [
     "CREATE INDEX IF NOT EXISTS idx_url_state_date ON url_state(date)",
     "CREATE INDEX IF NOT EXISTS idx_url_state_property_coverage ON url_state(property_key, gsc_coverage_state)",
     "CREATE INDEX IF NOT EXISTS idx_url_state_property_last_checked ON url_state(property_key, last_checked_at)",
+    "CREATE INDEX IF NOT EXISTS idx_url_state_property_next_check ON url_state(property_key, current_status, next_check_at)",
     "CREATE INDEX IF NOT EXISTS idx_check_log_property_checked ON check_log(property_key, checked_at)",
     "CREATE INDEX IF NOT EXISTS idx_check_log_property_url_checked ON check_log(property_key, url, checked_at)",
     "CREATE INDEX IF NOT EXISTS idx_login_events_logged_in_at ON login_events(logged_in_at DESC)",
@@ -393,7 +395,13 @@ def fetch_due_candidates(conn: DBConnection, property_key: str) -> List[Dict[str
             WHERE property_key = ?
               AND current_status != 'Indexed'
             ORDER BY
-              CASE WHEN check_count = 0 THEN 0 ELSE 1 END,
+              CASE
+                WHEN check_count > 0 AND next_check_at IS NOT NULL THEN 0
+                WHEN check_count > 0 THEN 1
+                ELSE 2
+              END,
+              CASE WHEN next_check_at IS NULL THEN 1 ELSE 0 END,
+              next_check_at ASC,
               sitemap_published_date DESC,
               id DESC
             """,
