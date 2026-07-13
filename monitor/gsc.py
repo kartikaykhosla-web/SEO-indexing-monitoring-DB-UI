@@ -44,12 +44,18 @@ def normalize_result(index_status: Dict[str, Any]) -> Dict[str, str]:
     indexing_state = str(index_status.get("indexingState", "") or "")
     page_fetch_state = str(index_status.get("pageFetchState", "") or "")
     robots_state = str(index_status.get("robotsTxtState", "") or "")
+    coverage_state_normalized = coverage_state.strip().lower()
 
     if robots_state == "DISALLOWED" or page_fetch_state == "BLOCKED_ROBOTS_TXT":
         status = "Blocked by robots.txt"
     elif indexing_state in ("BLOCKED_BY_META_TAG", "BLOCKED_BY_HTTP_HEADER"):
         status = "Blocked by noindex"
-    elif verdict == "PASS":
+    elif (
+        verdict == "PASS"
+        or indexing_state == "INDEXING_ALLOWED"
+        or coverage_state_normalized.endswith("and indexed")
+        or coverage_state_normalized in {"submitted and indexed", "indexed, not submitted in sitemap"}
+    ):
         status = "Indexed"
     elif verdict == "NEUTRAL":
         status = "Excluded"

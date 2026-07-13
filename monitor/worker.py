@@ -107,9 +107,6 @@ def row_due_for_gsc(row: Dict[str, str], now: dt.datetime) -> bool:
     if row.get("current_status") in TERMINAL_NON_INDEXED_STATUSES:
         return False
 
-    if parse_iso_datetime(row.get("google_last_crawl_at", "") or ""):
-        return False
-
     next_check = parse_iso_datetime(row.get("next_check_at", "") or "")
     if next_check and now < next_check:
         return False
