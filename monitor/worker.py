@@ -26,7 +26,6 @@ STALE_RETRY_INTERVAL_MINUTES = 240
 TERMINAL_NON_INDEXED_STATUSES = {
     "Blocked by robots.txt",
     "Blocked by noindex",
-    "Skipped - before cutoff",
 }
 
 
@@ -250,12 +249,11 @@ def run_property_gsc(
     now: dt.datetime,
 ) -> Dict[str, int]:
     state = db.get_property_state(conn, property_cfg.key)
-    metrics = {"checked": 0, "indexed_now": 0, "skipped_before_cutoff": 0}
-    metrics["skipped_before_cutoff"] = db.mark_pre_cutoff_non_indexed(
+    metrics = {"checked": 0, "indexed_now": 0, "deleted_before_cutoff": 0}
+    metrics["deleted_before_cutoff"] = db.delete_pre_cutoff_urls(
         conn,
         property_cfg.key,
         to_ist_iso(cutoff_datetime),
-        to_ist_iso(now),
     )
 
     candidates = db.fetch_due_candidates(conn, property_cfg.key)
@@ -375,7 +373,7 @@ def run_monitor(
         discovered = 0
         checked = 0
         indexed_now = 0
-        skipped_before_cutoff = 0
+        deleted_before_cutoff = 0
         state = db.get_property_state(conn, prop.key)
         if not property_run_due(prop, state, now_utc()):
             last_finished = to_ist_iso(parse_iso_datetime(state.get("last_run_finished_at", "")))
@@ -409,7 +407,7 @@ def run_monitor(
                     metrics = run_property_gsc(conn, gsc_service, prop, cutoff_datetime, now)
                     checked = metrics["checked"]
                     indexed_now = metrics["indexed_now"]
-                    skipped_before_cutoff = metrics.get("skipped_before_cutoff", 0)
+                    deleted_before_cutoff = metrics.get("deleted_before_cutoff", 0)
                 except Exception as exc:  # noqa: BLE001
                     summaries.append(f"{prop.key}: gsc_error={exc}")
                     continue
@@ -419,7 +417,7 @@ def run_monitor(
 
             summaries.append(
                 f"{prop.key}: discovered={discovered} checked={checked} "
-                f"indexed_now={indexed_now} skipped_before_cutoff={skipped_before_cutoff}"
+                f"indexed_now={indexed_now} deleted_before_cutoff={deleted_before_cutoff}"
             )
         finally:
             final_state = db.get_property_state(conn, prop.key)

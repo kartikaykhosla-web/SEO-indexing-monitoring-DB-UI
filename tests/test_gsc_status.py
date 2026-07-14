@@ -128,8 +128,8 @@ class GscStatusTests(unittest.TestCase):
         self.assertEqual(sum("/retry-" in url for url in first_run_urls), 20)
         self.assertEqual(sum("/new-" in url for url in first_run_urls), 5)
 
-    def test_pre_cutoff_non_indexed_rows_are_marked_skipped(self) -> None:
-        db_path = Path(tempfile.gettempdir()) / "seo_indexing_monitor_cutoff_skip_test.db"
+    def test_pre_cutoff_rows_and_logs_are_deleted(self) -> None:
+        db_path = Path(tempfile.gettempdir()) / "seo_indexing_monitor_cutoff_delete_test.db"
         db_path.unlink(missing_ok=True)
         conn = db.connect(str(db_path))
         db.init_db(conn)
@@ -138,44 +138,41 @@ class GscStatusTests(unittest.TestCase):
             "jagran.com",
             [
                 (
-                    "https://www.jagran.com/old-pending.html",
-                    "2026-07-13T23:59:00+05:30",
-                    "2026-07-13T23:59:10+05:30",
-                    "2026-07-13",
+                    "https://www.jagran.com/pre-cutoff.html",
+                    "2026-07-14T14:59:00+05:30",
+                    "2026-07-14T14:59:10+05:30",
+                    "2026-07-14",
                 ),
                 (
-                    "https://www.jagran.com/old-indexed.html",
-                    "2026-07-13T23:58:00+05:30",
-                    "2026-07-13T23:58:10+05:30",
-                    "2026-07-13",
-                ),
-                (
-                    "https://www.jagran.com/new-pending.html",
-                    "2026-07-14T00:01:00+05:30",
-                    "2026-07-14T00:01:10+05:30",
+                    "https://www.jagran.com/post-cutoff.html",
+                    "2026-07-14T15:01:00+05:30",
+                    "2026-07-14T15:01:10+05:30",
                     "2026-07-14",
                 ),
             ],
         )
-        rows = {row["url"]: row for row in db.fetch_property_urls(conn, "jagran.com")}
-        db.update_url_state(
+        db.insert_check_log(
             conn,
-            rows["https://www.jagran.com/old-indexed.html"]["id"],
-            {"current_status": "Indexed"},
+            {
+                "property_key": "jagran.com",
+                "url": "https://www.jagran.com/pre-cutoff.html",
+                "checked_at": "2026-07-14T15:05:00+05:30",
+                "status": "Pending",
+            },
         )
 
-        skipped = db.mark_pre_cutoff_non_indexed(
+        deleted = db.delete_pre_cutoff_urls(
             conn,
             "jagran.com",
-            "2026-07-14T00:00:00+05:30",
-            "2026-07-14T12:00:00+05:30",
+            "2026-07-14T15:00:00+05:30",
         )
         rows = {row["url"]: row for row in db.fetch_property_urls(conn, "jagran.com")}
+        logs = db.fetch_logs(conn, property_key="jagran.com", limit=10)
 
-        self.assertEqual(skipped, 1)
-        self.assertEqual(rows["https://www.jagran.com/old-pending.html"]["current_status"], "Skipped - before cutoff")
-        self.assertEqual(rows["https://www.jagran.com/old-indexed.html"]["current_status"], "Indexed")
-        self.assertEqual(rows["https://www.jagran.com/new-pending.html"]["current_status"], "Pending")
+        self.assertEqual(deleted, 1)
+        self.assertNotIn("https://www.jagran.com/pre-cutoff.html", rows)
+        self.assertIn("https://www.jagran.com/post-cutoff.html", rows)
+        self.assertEqual(logs, [])
 
 
 if __name__ == "__main__":
