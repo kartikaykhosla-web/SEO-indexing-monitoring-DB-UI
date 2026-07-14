@@ -7,7 +7,8 @@ from pathlib import Path
 
 from monitor import db
 from monitor.gsc import normalize_result
-from monitor.worker import row_due_for_gsc
+from monitor.config import PropertyConfig
+from monitor.worker import order_due_rows_for_gsc, row_due_for_gsc
 
 
 class GscStatusTests(unittest.TestCase):
@@ -90,6 +91,42 @@ class GscStatusTests(unittest.TestCase):
 
         self.assertEqual(candidates[0]["url"], "https://www.jagran.com/excluded-retry.html")
         self.assertEqual(candidates[1]["url"], "https://www.jagran.com/new-url.html")
+
+    def test_capped_runs_reserve_slots_for_new_pending_urls(self) -> None:
+        property_cfg = PropertyConfig(
+            key="jagran.com",
+            gsc_site_url="https://www.jagran.com/",
+            sitemap_urls=[],
+            max_gsc_checks_per_hour=25,
+            max_gsc_checks_per_run=25,
+        )
+        state = {
+            "gsc_hour_bucket": "2026-07-13T18:00:00+05:30",
+            "gsc_checks_this_hour": 0,
+        }
+        retry_rows = [
+            {
+                "url": f"https://www.jagran.com/retry-{index}.html",
+                "check_count": 2,
+                "next_check_at": "2026-07-13T18:10:00+05:30",
+            }
+            for index in range(25)
+        ]
+        new_rows = [
+            {
+                "url": f"https://www.jagran.com/new-{index}.html",
+                "check_count": 0,
+                "next_check_at": "",
+            }
+            for index in range(10)
+        ]
+        now = dt.datetime.fromisoformat("2026-07-13T18:30:00+05:30")
+
+        ordered = order_due_rows_for_gsc(property_cfg, state, retry_rows + new_rows, now)
+        first_run_urls = [row["url"] for row in ordered[:25]]
+
+        self.assertEqual(sum("/retry-" in url for url in first_run_urls), 20)
+        self.assertEqual(sum("/new-" in url for url in first_run_urls), 5)
 
 
 if __name__ == "__main__":

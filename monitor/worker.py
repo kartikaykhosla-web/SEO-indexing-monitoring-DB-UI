@@ -124,6 +124,41 @@ def row_due_for_gsc(row: Dict[str, str], now: dt.datetime) -> bool:
     return (now - last_checked) >= dt.timedelta(minutes=interval)
 
 
+def effective_check_limit(property_cfg: PropertyConfig, state: Dict[str, str], now: dt.datetime) -> Optional[int]:
+    limits = [
+        value
+        for value in (
+            property_cfg.max_gsc_checks_per_run,
+            remaining_hourly_capacity(property_cfg, state, now),
+        )
+        if value is not None
+    ]
+    return min(limits) if limits else None
+
+
+def order_due_rows_for_gsc(
+    property_cfg: PropertyConfig,
+    state: Dict[str, str],
+    rows: List[Dict[str, str]],
+    now: dt.datetime,
+) -> List[Dict[str, str]]:
+    retry_rows = [row for row in rows if int(row.get("check_count", 0) or 0) > 0]
+    new_rows = [row for row in rows if int(row.get("check_count", 0) or 0) == 0]
+    check_limit = effective_check_limit(property_cfg, state, now)
+
+    if not retry_rows or not new_rows or not check_limit or check_limit <= 1:
+        return retry_rows + new_rows
+
+    reserved_new = max(1, min(5, check_limit // 5))
+    retry_before_new = max(1, check_limit - reserved_new)
+    return (
+        retry_rows[:retry_before_new]
+        + new_rows[:reserved_new]
+        + retry_rows[retry_before_new:]
+        + new_rows[reserved_new:]
+    )
+
+
 def discover_new_rows(
     session: requests.Session,
     property_cfg: PropertyConfig,
@@ -224,6 +259,7 @@ def run_property_gsc(
             continue
         if row_due_for_gsc(row, now):
             due_rows.append(row)
+    due_rows = order_due_rows_for_gsc(property_cfg, state, due_rows, now)
 
     for row in due_rows:
         if not can_run_gsc(property_cfg, state, now):
