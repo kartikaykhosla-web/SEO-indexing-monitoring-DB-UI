@@ -8,7 +8,7 @@ from pathlib import Path
 from monitor import db
 from monitor.gsc import normalize_result
 from monitor.config import PropertyConfig
-from monitor.worker import order_due_rows_for_gsc, property_run_due, row_due_for_gsc
+from monitor.worker import new_discovery_check_slots, order_due_rows_for_gsc, property_run_due, row_due_for_gsc
 
 
 class GscStatusTests(unittest.TestCase):
@@ -240,6 +240,90 @@ class GscStatusTests(unittest.TestCase):
                 now,
             )
         )
+
+    def test_new_discovery_is_limited_to_remaining_check_slots(self) -> None:
+        db_path = Path(tempfile.gettempdir()) / "seo_indexing_monitor_discovery_slots_test.db"
+        db_path.unlink(missing_ok=True)
+        conn = db.connect(str(db_path))
+        db.init_db(conn)
+        property_cfg = PropertyConfig(
+            key="jagran.com",
+            gsc_site_url="https://www.jagran.com/",
+            sitemap_urls=[],
+            max_gsc_checks_per_hour=25,
+            max_gsc_checks_per_run=25,
+            max_new_urls_per_run=25,
+        )
+        now = dt.datetime.fromisoformat("2026-07-14T17:10:00+05:30")
+        state = {
+            "gsc_hour_bucket": "2026-07-14T17:00:00+05:30",
+            "gsc_checks_this_hour": 0,
+        }
+        db.upsert_discovered_urls(
+            conn,
+            "jagran.com",
+            [
+                (
+                    f"https://www.jagran.com/existing-{index}.html",
+                    "2026-07-14T17:00:00+05:30",
+                    "2026-07-14T17:00:10+05:30",
+                    "2026-07-14",
+                )
+                for index in range(20)
+            ],
+        )
+
+        slots = new_discovery_check_slots(
+            conn,
+            property_cfg,
+            state,
+            dt.datetime.fromisoformat("2026-07-14T16:40:00+05:30"),
+            now,
+        )
+
+        self.assertEqual(slots, 5)
+
+    def test_new_discovery_stops_when_existing_due_rows_fill_the_run(self) -> None:
+        db_path = Path(tempfile.gettempdir()) / "seo_indexing_monitor_discovery_full_test.db"
+        db_path.unlink(missing_ok=True)
+        conn = db.connect(str(db_path))
+        db.init_db(conn)
+        property_cfg = PropertyConfig(
+            key="jagran.com",
+            gsc_site_url="https://www.jagran.com/",
+            sitemap_urls=[],
+            max_gsc_checks_per_hour=25,
+            max_gsc_checks_per_run=25,
+            max_new_urls_per_run=25,
+        )
+        now = dt.datetime.fromisoformat("2026-07-14T17:10:00+05:30")
+        state = {
+            "gsc_hour_bucket": "2026-07-14T17:00:00+05:30",
+            "gsc_checks_this_hour": 0,
+        }
+        db.upsert_discovered_urls(
+            conn,
+            "jagran.com",
+            [
+                (
+                    f"https://www.jagran.com/existing-{index}.html",
+                    "2026-07-14T17:00:00+05:30",
+                    "2026-07-14T17:00:10+05:30",
+                    "2026-07-14",
+                )
+                for index in range(25)
+            ],
+        )
+
+        slots = new_discovery_check_slots(
+            conn,
+            property_cfg,
+            state,
+            dt.datetime.fromisoformat("2026-07-14T16:40:00+05:30"),
+            now,
+        )
+
+        self.assertEqual(slots, 0)
 
 
 if __name__ == "__main__":
