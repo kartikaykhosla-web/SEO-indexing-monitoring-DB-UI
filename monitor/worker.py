@@ -345,6 +345,15 @@ def run_property_gsc(
 
         if is_quota_exceeded_error(result.get("error", "")):
             state = set_quota_backoff(state, now)
+            backoff_until = state.get("gsc_quota_backoff_until", "")
+            if backoff_until:
+                db.schedule_pending_after_quota_backoff(
+                    conn,
+                    property_cfg.key,
+                    to_ist_iso(cutoff_datetime),
+                    backoff_until,
+                    checked_at,
+                )
             db.upsert_property_state(conn, state)
             break
 

@@ -174,6 +174,43 @@ class GscStatusTests(unittest.TestCase):
         self.assertIn("https://www.jagran.com/post-cutoff.html", rows)
         self.assertEqual(logs, [])
 
+    def test_quota_backoff_sets_next_check_for_untouched_pending_rows(self) -> None:
+        db_path = Path(tempfile.gettempdir()) / "seo_indexing_monitor_quota_pending_test.db"
+        db_path.unlink(missing_ok=True)
+        conn = db.connect(str(db_path))
+        db.init_db(conn)
+        db.upsert_discovered_urls(
+            conn,
+            "thedailyjagran.com",
+            [
+                (
+                    "https://www.thedailyjagran.com/pending.html",
+                    "2026-07-14T15:09:00+05:30",
+                    "2026-07-14T15:09:30+05:30",
+                    "2026-07-14",
+                ),
+                (
+                    "https://www.thedailyjagran.com/old.html",
+                    "2026-07-14T14:59:00+05:30",
+                    "2026-07-14T14:59:30+05:30",
+                    "2026-07-14",
+                ),
+            ],
+        )
+
+        scheduled = db.schedule_pending_after_quota_backoff(
+            conn,
+            "thedailyjagran.com",
+            "2026-07-14T15:00:00+05:30",
+            "2026-07-14T16:25:00+05:30",
+            "2026-07-14T15:25:00+05:30",
+        )
+        rows = {row["url"]: row for row in db.fetch_property_urls(conn, "thedailyjagran.com")}
+
+        self.assertEqual(scheduled, 1)
+        self.assertEqual(rows["https://www.thedailyjagran.com/pending.html"]["next_check_at"], "2026-07-14T16:25:00+05:30")
+        self.assertFalse(rows["https://www.thedailyjagran.com/old.html"]["next_check_at"])
+
 
 if __name__ == "__main__":
     unittest.main()

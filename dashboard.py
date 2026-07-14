@@ -439,6 +439,7 @@ for property_name in known_properties:
             "current_status": str(state.get("current_status", "idle") or "idle").lower(),
             "last_crawled_at": last_crawled_at,
             "last_run_finished_at": state.get("last_run_finished_at", ""),
+            "gsc_quota_backoff_until": state.get("gsc_quota_backoff_until", ""),
             "min_run_interval_minutes": (
                 property_cfg.min_run_interval_minutes if property_cfg else None
             ),
@@ -740,12 +741,16 @@ with run_status_tab:
     for row in run_rows:
         row["last_crawled_at_display"] = _format_ist(row.get("last_crawled_at", ""))
         row["last_run_finished_at_display"] = _format_ist(row.get("last_run_finished_at", ""))
-        row["next_eligible_run_display"] = _format_ist(
-            _next_property_eligible_run(
-                row.get("last_run_finished_at", ""),
-                row.get("min_run_interval_minutes"),
-            )
+        quota_backoff_until = _parse_dashboard_datetime(row.get("gsc_quota_backoff_until", ""))
+        next_property_run = _parse_dashboard_datetime(
+            _next_property_eligible_run(row.get("last_run_finished_at", ""), row.get("min_run_interval_minutes"))
         )
+        next_eligible_run = max(
+            [value for value in [next_property_run, quota_backoff_until] if value],
+            default=None,
+        )
+        row["quota_backoff_until_display"] = _format_ist(row.get("gsc_quota_backoff_until", ""))
+        row["next_eligible_run_display"] = next_eligible_run.isoformat() if next_eligible_run else ""
         row["current_status_display"] = str(row.get("current_status", "idle")).title()
     run_rows.sort(
         key=lambda row: (
@@ -769,6 +774,7 @@ with run_status_tab:
                 "current_status_display",
                 "last_crawled_at_display",
                 "last_run_finished_at_display",
+                "quota_backoff_until_display",
                 "next_eligible_run_display",
             ]
         ]
@@ -778,6 +784,7 @@ with run_status_tab:
             "Current Status",
             "Last Crawled At",
             "Last Run Finished At",
+            "Quota Backoff Until",
             "Next Eligible Run",
         ]
         st.dataframe(status_df, width="stretch", hide_index=True)

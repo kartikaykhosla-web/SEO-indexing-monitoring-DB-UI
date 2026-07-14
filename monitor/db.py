@@ -442,6 +442,32 @@ def delete_pre_cutoff_urls(
     return int(getattr(cursor, "rowcount", 0) or 0)
 
 
+def schedule_pending_after_quota_backoff(
+    conn: DBConnection,
+    property_key: str,
+    cutoff_datetime: str,
+    next_check_at: str,
+    updated_at: str,
+) -> int:
+    cursor = _execute(
+        conn,
+        """
+        UPDATE url_state
+        SET
+            next_check_at = ?,
+            updated_at = ?
+        WHERE property_key = ?
+          AND current_status = 'Pending'
+          AND check_count = 0
+          AND sitemap_published_date >= ?
+          AND (next_check_at IS NULL OR next_check_at < ?)
+        """,
+        (next_check_at, updated_at, property_key, cutoff_datetime, next_check_at),
+    )
+    _commit(conn)
+    return int(getattr(cursor, "rowcount", 0) or 0)
+
+
 def update_url_state(conn: DBConnection, row_id: int, fields: Dict[str, Any]) -> None:
     keys = sorted(fields.keys())
     if not keys:
