@@ -88,10 +88,10 @@ def property_run_due(property_cfg: PropertyConfig, state: Dict[str, str], now: d
     interval = property_cfg.min_run_interval_minutes
     if not interval:
         return True
-    last_finished = parse_iso_datetime(state.get("last_run_finished_at", "") or "")
-    if not last_finished:
+    last_crawled = parse_iso_datetime(state.get("last_crawled_at", "") or "")
+    if not last_crawled:
         return True
-    return now - last_finished >= dt.timedelta(minutes=interval)
+    return now - last_crawled >= dt.timedelta(minutes=interval)
 
 
 def next_poll_interval_minutes(first_checked_dt: Optional[dt.datetime], now: dt.datetime) -> int:
@@ -383,14 +383,9 @@ def run_monitor(
         checked = 0
         indexed_now = 0
         deleted_before_cutoff = 0
+        gsc_skip_reason = ""
         state = db.get_property_state(conn, prop.key)
-        if not property_run_due(prop, state, now_utc()):
-            last_finished = to_ist_iso(parse_iso_datetime(state.get("last_run_finished_at", "")))
-            summaries.append(
-                f"{prop.key}: skipped_recent_run last_finished={last_finished} "
-                f"min_gap_minutes={prop.min_run_interval_minutes}"
-            )
-            continue
+        gsc_due = property_run_due(prop, state, now)
 
         run_started_at = to_ist_iso(now_utc())
         state.update(
@@ -412,21 +407,28 @@ def run_monitor(
                     continue
 
             if run_gsc_checks:
-                try:
-                    metrics = run_property_gsc(conn, gsc_service, prop, cutoff_datetime, now)
-                    checked = metrics["checked"]
-                    indexed_now = metrics["indexed_now"]
-                    deleted_before_cutoff = metrics.get("deleted_before_cutoff", 0)
-                except Exception as exc:  # noqa: BLE001
-                    summaries.append(f"{prop.key}: gsc_error={exc}")
-                    continue
+                if gsc_due:
+                    try:
+                        metrics = run_property_gsc(conn, gsc_service, prop, cutoff_datetime, now)
+                        checked = metrics["checked"]
+                        indexed_now = metrics["indexed_now"]
+                        deleted_before_cutoff = metrics.get("deleted_before_cutoff", 0)
+                    except Exception as exc:  # noqa: BLE001
+                        summaries.append(f"{prop.key}: gsc_error={exc}")
+                        continue
+                else:
+                    last_crawled = to_ist_iso(parse_iso_datetime(state.get("last_crawled_at", "")))
+                    gsc_skip_reason = (
+                        f" skipped_recent_gsc last_crawled={last_crawled} "
+                        f"min_gap_minutes={prop.min_run_interval_minutes}"
+                    )
 
             if run_export:
                 export_all_json(conn, config.exports_dir, property_key=prop.key)
 
             summaries.append(
                 f"{prop.key}: discovered={discovered} checked={checked} "
-                f"indexed_now={indexed_now} deleted_before_cutoff={deleted_before_cutoff}"
+                f"indexed_now={indexed_now} deleted_before_cutoff={deleted_before_cutoff}{gsc_skip_reason}"
             )
         finally:
             final_state = db.get_property_state(conn, prop.key)
