@@ -8,7 +8,7 @@ from pathlib import Path
 from monitor import db
 from monitor.gsc import normalize_result
 from monitor.config import PropertyConfig
-from monitor.worker import order_due_rows_for_gsc, row_due_for_gsc
+from monitor.worker import order_due_rows_for_gsc, property_run_due, row_due_for_gsc
 
 
 class GscStatusTests(unittest.TestCase):
@@ -210,6 +210,36 @@ class GscStatusTests(unittest.TestCase):
         self.assertEqual(scheduled, 1)
         self.assertEqual(rows["https://www.thedailyjagran.com/pending.html"]["next_check_at"], "2026-07-14T16:25:00+05:30")
         self.assertFalse(rows["https://www.thedailyjagran.com/old.html"]["next_check_at"])
+
+    def test_min_run_interval_uses_last_gsc_crawl_not_last_discovery_finish(self) -> None:
+        property_cfg = PropertyConfig(
+            key="naidunia.com",
+            gsc_site_url="https://www.naidunia.com/",
+            sitemap_urls=[],
+            min_run_interval_minutes=60,
+        )
+        now = dt.datetime.fromisoformat("2026-07-14T16:10:00+05:30")
+
+        self.assertTrue(
+            property_run_due(
+                property_cfg,
+                {
+                    "last_run_finished_at": "2026-07-14T16:05:00+05:30",
+                    "last_crawled_at": "",
+                },
+                now,
+            )
+        )
+        self.assertFalse(
+            property_run_due(
+                property_cfg,
+                {
+                    "last_run_finished_at": "2026-07-14T16:05:00+05:30",
+                    "last_crawled_at": "2026-07-14T15:30:00+05:30",
+                },
+                now,
+            )
+        )
 
 
 if __name__ == "__main__":
