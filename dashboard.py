@@ -465,6 +465,7 @@ with filter_row1_col2:
             "Blocked by robots.txt",
             "Blocked by noindex",
             "Excluded",
+            "Skipped - before cutoff",
         ],
         index=0,
     )

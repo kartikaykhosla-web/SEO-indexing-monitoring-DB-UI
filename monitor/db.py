@@ -410,6 +410,30 @@ def fetch_due_candidates(conn: DBConnection, property_key: str) -> List[Dict[str
     )
 
 
+def mark_pre_cutoff_non_indexed(
+    conn: DBConnection,
+    property_key: str,
+    cutoff_datetime: str,
+    updated_at: str,
+) -> int:
+    cursor = _execute(
+        conn,
+        """
+        UPDATE url_state
+        SET
+            current_status = 'Skipped - before cutoff',
+            next_check_at = NULL,
+            updated_at = ?
+        WHERE property_key = ?
+          AND current_status NOT IN ('Indexed', 'Skipped - before cutoff')
+          AND sitemap_published_date < ?
+        """,
+        (updated_at, property_key, cutoff_datetime),
+    )
+    _commit(conn)
+    return int(getattr(cursor, "rowcount", 0) or 0)
+
+
 def update_url_state(conn: DBConnection, row_id: int, fields: Dict[str, Any]) -> None:
     keys = sorted(fields.keys())
     if not keys:
