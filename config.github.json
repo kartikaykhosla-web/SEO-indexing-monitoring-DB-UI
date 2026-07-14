@@ -4,7 +4,7 @@
   "service_account_json_path": "",
   "login_history_spreadsheet_id": "",
   "login_history_worksheet_name": "login_history",
-  "cutoff_datetime": "2026-07-14T00:00:00+05:30",
+  "cutoff_datetime": "2026-07-14T15:00:00+05:30",
   "properties": [
     {
       "key": "jagran.com",
