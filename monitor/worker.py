@@ -159,6 +159,31 @@ def order_due_rows_for_gsc(
     )
 
 
+def new_discovery_check_slots(
+    conn,
+    property_cfg: PropertyConfig,
+    state: Dict[str, str],
+    cutoff_datetime: dt.datetime,
+    now: dt.datetime,
+) -> Optional[int]:
+    check_limit = effective_check_limit(property_cfg, state, now)
+    if check_limit is None:
+        return property_cfg.max_new_urls_per_run
+    if check_limit <= 0:
+        return 0
+
+    candidates = db.fetch_due_candidates(conn, property_cfg.key)
+    due_rows: List[Dict[str, str]] = []
+    for row in candidates:
+        published_dt = parse_publication_datetime(row.get("sitemap_published_date", ""))
+        if not published_dt or published_dt < cutoff_datetime:
+            continue
+        if row_due_for_gsc(row, now):
+            due_rows.append(row)
+
+    return max(0, check_limit - len(due_rows))
+
+
 def discover_new_rows(
     session: requests.Session,
     property_cfg: PropertyConfig,
@@ -206,9 +231,13 @@ def run_property_discovery(
     property_cfg: PropertyConfig,
     cutoff_datetime: dt.datetime,
     now: dt.datetime,
+    max_new_rows: Optional[int] = None,
 ) -> int:
     state = db.get_property_state(conn, property_cfg.key)
     if not property_discovery_due(state, property_cfg.discovery_interval_minutes, now):
+        return 0
+
+    if max_new_rows == 0:
         return 0
 
     state["property_key"] = property_cfg.key
@@ -224,6 +253,8 @@ def run_property_discovery(
     if capacity is not None and capacity <= 0:
         db.upsert_property_state(conn, state)
         return 0
+    if max_new_rows is not None:
+        capacity = min(capacity, max_new_rows) if capacity is not None else max_new_rows
 
     existing = db.fetch_property_urls(conn, property_cfg.key)
     existing_urls = {row["url"] for row in existing}
@@ -401,7 +432,21 @@ def run_monitor(
         try:
             if run_discovery:
                 try:
-                    discovered = run_property_discovery(conn, session, prop, cutoff_datetime, now)
+                    max_new_rows = None
+                    if run_gsc_checks:
+                        max_new_rows = (
+                            new_discovery_check_slots(conn, prop, state, cutoff_datetime, now)
+                            if gsc_due
+                            else 0
+                        )
+                    discovered = run_property_discovery(
+                        conn,
+                        session,
+                        prop,
+                        cutoff_datetime,
+                        now,
+                        max_new_rows=max_new_rows,
+                    )
                 except Exception as exc:  # noqa: BLE001
                     summaries.append(f"{prop.key}: discovery_error={exc}")
                     continue
