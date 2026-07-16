@@ -162,7 +162,7 @@
       "gsc_site_url": "https://www.onlymyhealth.com/",
       "discovery_interval_minutes": 5,
       "sitemap_urls": [
-        "https://www.onlymyhealth.com/Resources/omh/xmls/news_sitemap/news-sitemap.xml"
+        "https://www.onlymyhealth.com/sitemap/news-sitemap-english.xml"
       ]
     },
     {
