@@ -283,7 +283,7 @@ class GscStatusTests(unittest.TestCase):
 
         self.assertEqual(slots, 5)
 
-    def test_new_discovery_stops_when_existing_due_rows_fill_the_run(self) -> None:
+    def test_new_discovery_reserves_fresh_slots_when_existing_due_rows_fill_the_run(self) -> None:
         db_path = Path(tempfile.gettempdir()) / "seo_indexing_monitor_discovery_full_test.db"
         db_path.unlink(missing_ok=True)
         conn = db.connect(str(db_path))
@@ -314,6 +314,70 @@ class GscStatusTests(unittest.TestCase):
                 for index in range(25)
             ],
         )
+
+        slots = new_discovery_check_slots(
+            conn,
+            property_cfg,
+            state,
+            dt.datetime.fromisoformat("2026-07-14T16:40:00+05:30"),
+            now,
+        )
+
+        self.assertEqual(slots, 5)
+
+    def test_new_discovery_stops_when_fresh_slots_already_have_pending_urls(self) -> None:
+        db_path = Path(tempfile.gettempdir()) / "seo_indexing_monitor_discovery_pending_fresh_test.db"
+        db_path.unlink(missing_ok=True)
+        conn = db.connect(str(db_path))
+        db.init_db(conn)
+        property_cfg = PropertyConfig(
+            key="jagran.com",
+            gsc_site_url="https://www.jagran.com/",
+            sitemap_urls=[],
+            max_gsc_checks_per_hour=25,
+            max_gsc_checks_per_run=25,
+            max_new_urls_per_run=25,
+        )
+        now = dt.datetime.fromisoformat("2026-07-14T17:10:00+05:30")
+        state = {
+            "gsc_hour_bucket": "2026-07-14T17:00:00+05:30",
+            "gsc_checks_this_hour": 0,
+        }
+        db.upsert_discovered_urls(
+            conn,
+            "jagran.com",
+            [
+                (
+                    f"https://www.jagran.com/retry-{index}.html",
+                    "2026-07-14T17:00:00+05:30",
+                    "2026-07-14T17:00:10+05:30",
+                    "2026-07-14",
+                )
+                for index in range(25)
+            ]
+            + [
+                (
+                    f"https://www.jagran.com/fresh-pending-{index}.html",
+                    "2026-07-14T17:05:00+05:30",
+                    "2026-07-14T17:05:10+05:30",
+                    "2026-07-14",
+                )
+                for index in range(5)
+            ],
+        )
+        rows = {row["url"]: row for row in db.fetch_property_urls(conn, "jagran.com")}
+        for index in range(25):
+            db.update_url_state(
+                conn,
+                rows[f"https://www.jagran.com/retry-{index}.html"]["id"],
+                {
+                    "current_status": "Excluded",
+                    "check_count": 1,
+                    "first_checked_at": "2026-07-14T17:01:00+05:30",
+                    "last_checked_at": "2026-07-14T17:01:00+05:30",
+                    "next_check_at": "2026-07-14T17:05:00+05:30",
+                },
+            )
 
         slots = new_discovery_check_slots(
             conn,
