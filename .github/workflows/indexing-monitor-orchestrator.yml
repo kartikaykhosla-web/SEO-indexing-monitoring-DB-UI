@@ -1,15 +1,15 @@
-name: Indexing Monitor - Hourly Orchestrator
+name: Indexing Monitor - 5 Minute Orchestrator
 
 on:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: indexing-monitor-hourly-orchestrator
+  group: indexing-monitor-5-minute-orchestrator
   cancel-in-progress: false
 
 jobs:
