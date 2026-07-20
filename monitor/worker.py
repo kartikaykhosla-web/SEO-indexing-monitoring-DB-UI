@@ -174,14 +174,20 @@ def new_discovery_check_slots(
 
     candidates = db.fetch_due_candidates(conn, property_cfg.key)
     due_rows: List[Dict[str, str]] = []
+    pending_new_due_count = 0
     for row in candidates:
         published_dt = parse_publication_datetime(row.get("sitemap_published_date", ""))
         if not published_dt or published_dt < cutoff_datetime:
             continue
         if row_due_for_gsc(row, now):
             due_rows.append(row)
+            if int(row.get("check_count", 0) or 0) == 0:
+                pending_new_due_count += 1
 
-    return max(0, check_limit - len(due_rows))
+    remaining_slots = max(0, check_limit - len(due_rows))
+    reserved_new_slots = max(1, min(5, check_limit // 5))
+    fresh_slots = max(0, reserved_new_slots - pending_new_due_count)
+    return max(remaining_slots, fresh_slots)
 
 
 def discover_new_rows(
